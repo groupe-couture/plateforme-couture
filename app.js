@@ -1,0 +1,409 @@
+import {preserveSelectValue,enableManualDeliveryAssignments,mountDepartmentDirectory} from './preserve-select-value.mjs?v=1.21.11';
+import {mountRosterReadiness} from './access-readiness.mjs?v=1.21.11';
+import {createSubscriptionErrors} from './subscription-errors.mjs?v=1.21.11';
+import {checkWorkspaceRelease} from './workspace-release.mjs?v=1.21.11';
+import {createPilotageUI} from './pilotage-ui.mjs?v=1.21.11';
+import {createManagementApi} from './management-api.mjs?v=1.21.11';
+import {createPasswordFlow,cleanPasswordUrl,RECOVERY_EXPIRED} from './password-flow.mjs?v=1.21.11';
+import {applyPlatformBrand} from './branding.mjs?v=1.21.11';
+import {createCentralReportingUI} from './central-reporting-ui.mjs?v=1.21.11';
+import {readAccessContext} from './access-context.mjs?v=1.21.11';
+import {createCentralReporting} from './central-reporting-core.mjs?v=1.21.11';
+import {workspaceNavigation,platformDestination} from './platform-navigation.mjs?v=1.21.11';
+import {canViewModule,canViewGroup,initialWorkspaceView} from './permissions.mjs?v=1.21.11';
+import {createBilling} from './billing-ui.mjs?v=1.21.11';
+import {createDossierService} from './dossier.mjs?v=1.21.11';
+import {createOperations} from './operations-ui.mjs?v=1.21.11';
+import {saleErrors} from './reporting.mjs?v=1.21.11';
+import {createModules} from './modules-ui.mjs?v=1.21.11';
+import {stampPreparation,preparationDateErrors} from './preparation-history.mjs?v=1.21.11';
+import {ROLES,parseRoster,draftErrors,newId,validEmail,employeeDepartmentGroups} from './invitations.mjs?v=1.21.11';
+import {urgentDelivery,reminderDelivery,deliveryReady} from './delivery.mjs?v=1.21.11';
+import {recordErrors} from './record-validation.mjs?v=1.21.11';
+import {preparationSummary} from './preparation-view.mjs?v=1.21.11';
+import {TEAM_VIEWS,ACCESS_FIELDS,SUBMENUS,canViewSubcategory,availableSubcategories,canViewTeam,availableTeamViews,canEditObjectives,canManageAccess} from './permissions.mjs?v=1.21.11';
+import {SECTIONS,departmentSummary} from './objectives.mjs?v=1.21.11';
+import {DEPARTMENTS} from './departments.mjs?v=1.21.11';
+import {STEPS,objectiveSummary,stepsFor,STATES,today,dayKey,dateObj,age,complete,progress,counts,preparationQueue,defaultSteps,validate,esc} from './domain.mjs?v=1.21.11';
+import {supabaseConfig} from './supabase-config.js?v=1.21.11';
+import {createSupabaseBridge} from './supabase-bridge.mjs?v=1.21.11';
+const $=s=>document.querySelector(s),demo=new URLSearchParams(location.search).get('demo')==='1';
+const selectedDealership=new URLSearchParams(location.search).get('concession')||'levis-subaru';
+let accessReadinessOpen=false;
+const APP_VERSION='1.21.11';let lastWorkspaceReleaseCheck=0;
+async function checkPublishedWorkspace(){if(Date.now()-lastWorkspaceReleaseCheck<15000)return false;lastWorkspaceReleaseCheck=Date.now();return checkWorkspaceRelease({currentVersion:APP_VERSION,href:location.href});}
+let metricUnsubs=[],metricYear='',departmentData={},objectiveView='vente';
+let employees=[],messages=[],teamView='users',editingEmployee=null,inviteDraft=null,inviting=false,editingMessage=null;
+let records=[],goals={},team=[],tab='vo',search='',filter='all',calendarDate=dateObj(today()),calendarMode='month',selectedDay='',user=null,profile=null,editing=null,workingSteps={},unsubs=[],sdk={},auth,db,busy=false,ready=false;
+const TITLE={vo:['Préparation VO','Les plus anciens en premier. Les prochaines étapes en un regard.'],deliveries:['Livraisons','Des engagements clairs, jusqu’à la remise des clés.'],calendar:['Calendrier des livraisons','Planifiez les rendez-vous et suivez vos objectifs mensuels.'],settings:['KPI','Saisissez les résultats et objectifs de votre département.'],team:['Équipe','Les utilisateurs de la plateforme et leurs postes.']};
+function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,4000);}
+const subscriptionErrors=createSubscriptionErrors(errors=>{$('#error').textContent=errors.map(message).join(' • ');$('#error').hidden=errors.length===0;});
+function fail(e){subscriptionErrors.report(e);}
+function message(e){if(e?.code==='permission-denied')return 'Accès refusé. Vérifiez le profil utilisateur, son niveau d’accès et active = vrai.';if(e?.code==='auth/invalid-credential')return 'Courriel ou mot de passe incorrect.';if(e?.code==='PGRST301'||e?.code==='42501')return 'Accès Supabase refusé. Vérifiez le rôle et les permissions.';return e?.message||'Une erreur est survenue. Réessayez.';}
+function monthKey(){return dayKey(calendarDate).slice(0,7);}
+function badge(s){return `<span class="badge ${['Livré','Finalisé','Prête','Terminé'].includes(s)?'green':['Bloqué','Demandée','En attente de planification'].includes(s)?'orange':''}">${esc(s)}</span>`;}
+function recordStatus(v){return v.blocker?'Bloqué':complete(v)?'Finalisé':'En préparation';}
+function slots(date,id){return records.filter(v=>!v.archived&&v.id!==id&&v.delivery?.date===date&&v.delivery.status!=='Annulée');}
+function metric(label,value,sub,ratio){return `<div class="metric"><span>${label}</span><strong>${value}</strong><small>${sub}</small>${ratio!==undefined?`<div class="bar"><i style="width:${Math.min(100,ratio)}%"></i></div>`:''}</div>`;}
+function render(){if(!canViewModule(profile,tab))tab='vo';if(!user||workspacePilotage.hold()||modules.hold()||operations.hold()||billing.hold())return;$('#metrics').classList.toggle('delivery-metrics',['deliveries','calendar'].includes(tab));const allowed=availableTeamViews(profile);if(tab==='team'&&!allowed.length)tab='vo';if(tab==='team'&&!canViewTeam(profile,teamView))teamView=allowed[0][0];const objectives=availableSubcategories(profile,'settings');if(tab==='settings'&&!objectives.length)tab='vo';if(tab==='settings'&&!canViewSubcategory(profile,'settings',objectiveView))objectiveView=objectives[0][0];renderSidebars();document.querySelectorAll('nav>[data-tab]').forEach(b=>b.hidden=!canViewModule(profile,b.dataset.tab)||(b.dataset.tab==='group'&&demo));$('#metrics').hidden=profile?.role==='employe'||tab==='reports';document.querySelector('[data-tab="operations"]').hidden=!canEditObjectives(profile,'vente');document.querySelector('[data-tab="billing"]').hidden=!canEditObjectives(profile,'vente');subscribeMetrics();document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab===tab));if(tab==='home'){renderWorkspacePilotage();modules.nav();return;}operations.connect();if(central.render(tab)){modules.nav();return;}if(modules.render(tab))return;if(operations.render())return;if(billing.render())return;$('#pageTitle').textContent=TITLE[tab][0];$('#subtitle').textContent=TITLE[tab][1];document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab===tab));$('#add').hidden=tab==='settings'||(tab==='team'&&(teamView!=='users'||!canManageAccess(profile)));$('#add').disabled=!ready;$('#add').textContent=tab==='team'?'+ Ajouter un employé':tab==='vo'?'+ Ajouter un VO':'+ Demander une livraison';const list=records.filter(v=>!v.archived),ct=counts(records,monthKey()),g=goals[monthKey()]||{VN:0,VO:0};
+if(tab==='vo')$('#metrics').innerHTML=metric('VO en préparation',preparationQueue(list).filter(v=>!complete(v)).length,'File d’arrivée')+metric('Préparation finalisée',preparationQueue(list).filter(complete).length,'Étapes complétées')+metric('Dossiers bloqués',list.filter(v=>v.type==='VO'&&v.blocker&&v.delivery?.status!=='Livré').length,'Une intervention est requise')+metric('Photos à faire',preparationQueue(list).filter(v=>!['Terminé','Non requis'].includes(v.steps?.photos?.status)).length,'Véhicules à photographier');
+else $('#metrics').innerHTML=metric('Neufs livrés / objectif',`${ct.VN} / ${g.VN||'—'}`,`Mois : ${monthKey()}`,g.VN?ct.VN/g.VN*100:0)+metric('Occasions livrées / objectif',`${ct.VO} / ${g.VO||'—'}`,`Mois : ${monthKey()}`,g.VO?ct.VO/g.VO*100:0)+metric('Livraisons à venir',list.filter(v=>v.delivery&&['Demandée','Confirmée','Prête'].includes(v.delivery.status)&&v.delivery.date>=today()).length,'Demandées, confirmées ou prêtes')+metric('Livraisons urgentes',list.filter(v=>urgentDelivery(v)).length,'Non prêtes · rendez-vous dans 8 h ou en retard')+metric('Rappels de préparation',list.filter(v=>reminderDelivery(v)).length,'Non prêtes · rendez-vous dans 24 h ou moins');
+if(tab==='vo'||tab==='deliveries'){const opts=tab==='vo'?['all','En préparation','Finalisé','Bloqué']:['all','Demandée','Confirmée','Prête','Livré','Annulée'];$('#toolbar').innerHTML=`<input id="search" aria-label="Rechercher un véhicule" placeholder="Stock, véhicule, client…" value="${esc(search)}"><select id="filter" aria-label="Filtrer les statuts" style="width:auto">${opts.map(v=>`<option value="${esc(v)}" ${v===filter?'selected':''}>${v==='all'?'Tous les statuts':v}</option>`).join('')}</select><span class="spacer"></span><button id="export">Exporter CSV</button>`;renderTable();$('#search').oninput=e=>{search=e.target.value;renderTable();};$('#filter').onchange=e=>{filter=e.target.value;renderTable();};$('#export').onclick=exportCSV;}
+else if(tab==='calendar'){ $('#toolbar').innerHTML=`<div class="legend"><span><i></i>Neuf</span><span><i class="vo"></i>Occasion</span></div><span class="spacer"></span><button id="mode">Vue ${calendarMode==='month'?'semaine':'mois'}</button><button id="now">Aujourd’hui</button>`;renderCalendar();$('#mode').onclick=()=>{calendarMode=calendarMode==='month'?'week':'month';render();};$('#now').onclick=()=>{calendarDate=dateObj(today());render();};}
+else{ $('#toolbar').innerHTML='';if(tab==='team')renderTeam();else renderSettings();}}
+function visible(){let rows=tab==='vo'?preparationQueue(records):records.filter(v=>!v.archived&&v.delivery).sort((a,b)=>((a.delivery.date||'')+(a.delivery.time||'')).localeCompare((b.delivery.date||'')+(b.delivery.time||'')));const q=search.toLocaleLowerCase();return rows.filter(v=>(filter==='all'||(tab==='vo'?recordStatus(v):v.delivery.status)===filter)&&[v.stock,v.model,v.delivery?.client].join(' ').toLocaleLowerCase().includes(q));}
+function renderTable(){
+ const rows=visible(),now=Date.now();
+ const isUrgent=v=>urgentDelivery(v,now),isReminder=v=>reminderDelivery(v,now);
+ const table=items=>`<div class="table-wrap"><table><thead><tr>${(tab==='vo'?['Véhicule','Arrivée','Étapes','Emplacement / clés','Blocage','État','']:['Véhicule / client','Livraison prévue','Préparation','Livreur','État','']).map(t=>`<th>${t}</th>`).join('')}</tr></thead><tbody>${items.map(v=>{
+  const urgent=tab==='deliveries'&&isUrgent(v),reminder=tab==='deliveries'&&isReminder(v);
+  return `<tr class="${urgent?'urgent-row':reminder?'reminder-row':''}"><td><strong>${esc(v.stock)} · ${esc(v.model)}</strong><small>${esc(v.color||'Couleur non renseignée')}</small><small>${tab==='deliveries'?esc(v.delivery.client||'Client à préciser'):esc(v.vin||'NIV non renseigné')}</small></td>${tab==='vo'?`<td>${esc(v.arrival)}<small>${v.arrival?age(v.arrival)+' jours':'Date à compléter'}</small></td><td>${preparationSummary(v)}</td><td>${esc(v.location)}<small>Clés : ${esc(v.keys||'À préciser')}</small></td><td>${esc(v.blocker||'—')}</td><td>${badge(recordStatus(v))}</td>`:`<td class="${urgent?'urgent-text':reminder?'reminder-text':''}">${urgent?'! ':reminder?'⚠ ':''}${esc(v.delivery.date)} · ${esc(v.delivery.time)}<small>${v.delivery.status==='Livré'?'Livré le '+esc(v.delivery.actualDate):esc(v.type==='VN'?'Neuf':'Occasion')}</small>${reminder?'<small class="reminder-text">Rappel : préparer avant la livraison</small>':''}</td><td>${urgent?'<span class="urgent-text">! '+(complete(v)?'Prêt à confirmer':'Non prête')+'</span>':badge(deliveryReady(v)?'Prête':recordStatus(v))}<small>${progress(v)} / ${stepsFor(v).length} étapes</small></td><td>${esc(v.delivery.driver)}</td><td>${urgent?'<span class="urgent-text">! '+esc(v.delivery.status)+'</span>':badge(v.delivery.status)}</td>`}<td><button data-edit="${esc(v.id)}">Ouvrir</button></td></tr>`;
+ }).join('')}</tbody></table></div>`;
+ if(!ready)$('#content').innerHTML='<div class="empty">Chargement des dossiers…</div>';
+ else if(tab==='deliveries'){
+  const urgent=rows.filter(isUrgent),reminders=rows.filter(isReminder),normal=rows.filter(v=>!isUrgent(v)&&!isReminder(v));
+  $('#content').innerHTML=`<section class="urgent-deliveries" aria-labelledby="urgentTitle"><h2 id="urgentTitle">! Urgent</h2><p>Véhicules non prêts : rendez-vous dans huit heures ou moins, ou déjà dépassé. Heure du Québec.</p>${urgent.length?table(urgent):'<div class="empty compact-empty">Aucune livraison urgente dans les résultats affichés.</div>'}</section><section class="reminder-deliveries" aria-labelledby="reminderTitle"><h2 id="reminderTitle">⚠ À préparer · rappel 24 h</h2><p>Livraisons non prêtes prévues dans plus de 8 h et au maximum 24 h. Complétez les étapes et confirmez le véhicule prêt.</p>${reminders.length?table(reminders):'<div class="empty compact-empty">Aucun rappel de préparation dans les résultats affichés.</div>'}</section><section class="normal-deliveries" aria-labelledby="normalTitle"><h2 id="normalTitle">Livraisons</h2>${normal.length?table(normal):'<div class="empty compact-empty">Aucune autre livraison dans les résultats affichés.</div>'}</section>`;
+ }else $('#content').innerHTML=rows.length?table(rows):'<div class="empty"><h2>Aucun dossier à afficher</h2><p>Ajoutez un véhicule ou ajustez les filtres.</p></div>';
+ bindOpen();
+}
+function bindOpen(){document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openRecord(b.dataset.edit));}
+function renderCalendar(){const month=calendarDate.toLocaleDateString('fr-CA',{month:'long',year:'numeric'}),start=new Date(calendarDate);if(calendarMode==='month')start.setDate(1);start.setDate(start.getDate()-((start.getDay()+6)%7));let days=calendarMode==='week'?7:42;const active=records.filter(v=>!v.archived&&v.delivery&&v.delivery.status!=='Annulée');$('#content').innerHTML=`<div class="calendar-head"><button id="prev" aria-label="Période précédente">←</button><h2>${esc(month)}${calendarMode==='week'?` · semaine du ${dayKey(start)}`:''}</h2><button id="next" aria-label="Période suivante">→</button></div><div class="calendar-wrap"><div class="calendar">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d=>`<div class="weekday">${d}</div>`).join('')}${Array.from({length:days},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);const key=dayKey(d),planned=active.filter(v=>v.delivery.date===key).sort((a,b)=>a.delivery.time.localeCompare(b.delivery.time));return `<div class="day ${key===today()?'today':''} ${d.getMonth()!==calendarDate.getMonth()?'other':''}"><div class="day-top"><strong>${d.getDate()}</strong><button data-day="${key}" aria-label="Ajouter une livraison le ${key}" style="padding:2px 7px">+</button></div>${planned.map(v=>`<button class="event ${v.type==='VO'?'vo':''} ${v.delivery.status==='Livré'?'delivered':''} ${urgentDelivery(v)?'urgent-event':reminderDelivery(v)?'reminder-event':''}" data-edit="${esc(v.id)}">${urgentDelivery(v)?'! Urgent · ':reminderDelivery(v)?'⚠ Rappel 24 h · ':''}${esc(v.delivery.time)} · ${esc(v.type)}<strong>${esc(v.stock)} · ${esc(v.model)}</strong>${esc(v.color||'')} · ${esc(v.delivery.status)}</button>`).join('')}${planned.length?`<small>${planned.filter(v=>v.type==='VN').length} VN · ${planned.filter(v=>v.type==='VO').length} VO</small>`:''}</div>`;}).join('')}</div></div><p class="muted">Les rendez-vous apparaissent à leur date prévue. Les compteurs utilisent la date réelle des véhicules livrés. Les livraisons annulées sont exclues du calendrier.</p>`;bindOpen();document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>openRecord(null,b.dataset.day));for(const [id,n]of [['prev',-1],['next',1]])$('#'+id).onclick=()=>{if(calendarMode==='month'){calendarDate.setDate(1);calendarDate.setMonth(calendarDate.getMonth()+n);}else calendarDate.setDate(calendarDate.getDate()+n*7);render();};}
+function renderSalesSettings(){const m=monthKey(),g=goals[m]||{VN:0,VO:0},summary=objectiveSummary(records,goals,m);const monthLabel=dateObj(m+'-01').toLocaleDateString('fr-CA',{month:'long',year:'numeric'});$('#metrics').innerHTML=['VN','VO'].map(k=>{const label=k==='VN'?'Neufs':'Occasions',target=goals[m]?.[k],t=summary.target[k],sub=summary.elapsed?`Du 1er janvier au ${summary.cutoff} · ${summary.missing[k]?summary.missing[k]+' mois sans objectif':'objectifs cumulés'}`:'Année future : aucun cumul à date';return metric(label+' · mois sélectionné',`${summary.month[k]} / ${target??'—'}`,monthLabel,target?summary.month[k]/target*100:0)+metric(label+' · année à date',`${summary.ytd[k]} / ${summary.elapsed&&summary.missing[k]<summary.elapsed?t:'—'}`,sub,t?summary.ytd[k]/t*100:0);}).join('');$('#content').innerHTML=`<div class="settings"><h2>Objectifs mensuels</h2><p class="muted">Les valeurs sont propres à chaque mois. Aucun objectif n’est défini automatiquement.</p><form id="goalForm"><label>Mois<input name="month" type="month" required value="${m}"></label><div class="form-grid"><label>Objectif véhicules neufs<input name="VN" type="number" min="0" max="10000" step="1" required value="${g.VN}"></label><label>Objectif véhicules d’occasion<input name="VO" type="number" min="0" max="10000" step="1" required value="${g.VO}"></label></div><button class="primary">Enregistrer les objectifs</button></form><h3>Dossiers archivés</h3>${records.filter(v=>v.archived).map(v=>`<p>${esc(v.stock)} · ${esc(v.model)} <button data-restore="${esc(v.id)}">Restaurer</button></p>`).join('')||'<p class="muted">Aucun dossier archivé.</p>'}</div>`;const f=$('#goalForm');if(!canEditObjectives(profile,'vente')){f.elements.VN.disabled=true;f.elements.VO.disabled=true;f.querySelector('button').hidden=true;}f.elements.month.onchange=()=>{calendarDate=dateObj(f.elements.month.value+'-01');render();};f.onsubmit=async e=>{e.preventDefault();if(!canEditObjectives(profile,'vente'))return;const btn=f.querySelector('button');btn.disabled=true;try{const data={VN:Number(f.elements.VN.value),VO:Number(f.elements.VO.value)};if(!Number.isInteger(data.VN)||!Number.isInteger(data.VO)||data.VN<0||data.VO<0)throw Error('Objectifs invalides.');if(demo){goals[m]=data;persistDemo();}else await sdk.setDoc(sdk.doc(db,'goals',m),{...data,updatedBy:user.uid,updatedAt:new Date().toISOString()});toast('Objectifs enregistrés');render();}catch(e){fail(e);}finally{btn.disabled=false;}};document.querySelectorAll('[data-restore]').forEach(b=>b.onclick=async()=>{const v=records.find(v=>v.id===b.dataset.restore);try{await saveRecord({...v,archived:false},v.version,'Dossier restauré');toast('Dossier restauré');}catch(e){fail(e);}});}
+function numberFormat(value,unit){if(!Number.isFinite(value))return '—';return new Intl.NumberFormat('fr-CA',{maximumFractionDigits:unit==='véhicules'?0:2}).format(value)+(unit?' '+unit:'');}
+function departmentCards(section){const summary=departmentSummary(departmentData,section,monthKey(),today()),config=SECTIONS[section],end=monthKey().slice(0,4)<today().slice(0,4)?monthKey().slice(0,4)+'-12-31':today();let cards='';for(const [k,label,unit]of config.fields){const a=summary.current[k],b=summary.current['goal_'+k],y=summary.ytd[k],g=summary.ytd['goal_'+k];cards+=metric(label+' · mois',numberFormat(a,unit)+' / '+numberFormat(b,unit),monthKey())+metric(label+' · année à date',numberFormat(y.value,unit)+' / '+numberFormat(g.value,unit),`Jusqu’au ${end} · ${y.missing} mois sans résultat · ${g.missing} sans objectif`);}if(['service','piece'].includes(section)){cards+=metric('Marge brute · mois',numberFormat(summary.monthRatios.margin,'%')+' / '+numberFormat(summary.monthRatios.goal_margin,'%'),'Profit brut / chiffre d’affaires')+metric('Marge brute · année à date',numberFormat(summary.yearRatios.margin,'%')+' / '+numberFormat(summary.yearRatios.goal_margin,'%'),'Calculée sur les montants cumulés');}if(section==='service'){cards+=metric('Taux horaire effectif · mois',numberFormat(summary.monthRatios.rate,'$/h')+' / '+numberFormat(summary.monthRatios.goal_rate,'$/h'),'Chiffre d’affaires MO / heures vendues')+metric('Taux horaire effectif · année à date',numberFormat(summary.yearRatios.rate,'$/h')+' / '+numberFormat(summary.yearRatios.goal_rate,'$/h'),'Calculé sur les montants et heures cumulés');}return cards;}
+function departmentForm(section){const config=SECTIONS[section],data=departmentData[section+'_'+monthKey()]||{},admin=canEditObjectives(profile,section);return `<div class="settings department-entry"><h2>${config.label} · résultats et objectifs</h2><p class="muted">Saisie mensuelle des résultats réels et objectifs. Un champ vide signifie non renseigné. Les marges et taux sont calculés automatiquement.</p><form id="departmentForm"><div class="form-grid">${config.fields.map(([k,label,unit])=>['', 'goal_'].map(prefix=>`<label>${prefix?'Objectif':'Résultat'} · ${label} (${unit})<input name="${prefix+k}" type="number" ${k.includes('profit')||k.includes('Profit')?'':'min="0"'} step="${k==='prepared'?'1':'0.01'}" value="${data[prefix+k]??''}" ${admin?'':'disabled'}></label>`).join('')).join('')}</div>${admin?'<button class="primary">Enregistrer les résultats et objectifs</button>':''}<p id="departmentError" role="alert" class="error"></p></form></div>`;}
+function bindDepartmentForm(){const f=$('#departmentForm');if(!f)return;f.onsubmit=async e=>{e.preventDefault();if(!canEditObjectives(profile,objectiveView))return;const b=f.querySelector('button');b.disabled=true;try{const payload={};for(const [k]of SECTIONS[objectiveView].fields){for(const key of [k,'goal_'+k]){const raw=f.elements[key].value;payload[key]=raw===''?null:Number(raw);if(raw!==''&&!Number.isFinite(payload[key]))throw Error('Valeur invalide.');if(raw!==''&&!k.toLowerCase().includes('profit')&&payload[key]<0)throw Error('Cette valeur doit être positive.');if(k==='prepared'&&payload[key]!==null&&!Number.isInteger(payload[key]))throw Error('Le nombre de véhicules doit être entier.');}}const id=objectiveView+'_'+monthKey();if(demo){departmentData[id]=payload;persistDemo();}else await sdk.setDoc(sdk.doc(db,'departmentMetrics',id),{...payload,updatedAt:new Date().toISOString(),updatedBy:user.uid});toast('Résultats et objectifs enregistrés');render();}catch(err){$('#departmentError').textContent=message(err);}finally{b.disabled=false;}};}
+function renderSettings(){if(objectiveView==='vente'){renderSalesSettings();$('#metrics').innerHTML+=departmentCards('vente');$('#content').insertAdjacentHTML('beforeend',departmentForm('vente'));}else{const config=SECTIONS[objectiveView];$('#metrics').innerHTML=departmentCards(objectiveView);let extra='';if(objectiveView==='esthetique'){const waiting=records.filter(v=>!v.archived&&v.delivery?.status!=='Livré'&&!['Terminé','Non requis'].includes(v.steps?.lavage?.status));extra=`<div class="notice">Actuellement ${waiting.length} véhicule(s) avec lavage à compléter dans la plateforme. Ce compteur est une vue actuelle, sans historique mensuel.</div>`;}$('#content').innerHTML=`<label class="month-picker">Mois sélectionné<input id="objectiveMonth" type="month" value="${monthKey()}" required></label>${extra}${departmentForm(objectiveView)}`;$('#objectiveMonth').onchange=e=>{if(!e.target.value)return;calendarDate=dateObj(e.target.value+'-01');render();};}bindDepartmentForm();}
+function selectOptions(items,value){return [...new Set([...items,value].filter(Boolean))].map(v=>`<option ${v===value?'selected':''}>${esc(v)}</option>`).join('');}
+function syncDeliveryFields(){
+ const f=$('#recordForm'),enabled=f.elements.hasDelivery.checked;
+ $('#deliveryFields').hidden=!enabled;$('#deliveryFields').disabled=!enabled;
+ $('#serviceDeliveryFields').hidden=!enabled;
+ for(const k of ['parts','promises'])f.elements[k].disabled=!enabled;
+ const actual=enabled&&f.elements.deliveryStatus.value==='Livré';
+ $('#actualDateLabel').hidden=!actual;f.elements.actualDate.disabled=!actual;f.elements.actualDate.required=actual;
+}
+function clearRecordErrors(){
+ const f=$('#recordForm');
+ f.querySelectorAll('[aria-invalid]').forEach(n=>{n.removeAttribute('aria-invalid');n.removeAttribute('aria-describedby');});
+ f.querySelectorAll('.field-error').forEach(n=>n.remove());
+ f.querySelectorAll('.section-invalid').forEach(n=>n.classList.remove('section-invalid'));
+ $('#recordErrors').hidden=true;$('#recordErrors').innerHTML='';
+}
+function showRecordErrors(errors){
+ clearRecordErrors();const fields=Object.keys(errors);if(!fields.length)return;
+ const f=$('#recordForm');
+ for(const key of fields){
+  const input=f.elements[key];if(!input)continue;
+  input.id='record_'+key;input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby','error_'+key);
+  const error=document.createElement('span');error.className='field-error';error.id='error_'+key;error.textContent=errors[key];input.closest('label')?.append(error);
+  input.closest('[data-record-section]')?.classList.add('section-invalid');
+ }
+ $('#recordErrors').hidden=false;$('#recordErrors').innerHTML=`<strong>Enregistrement impossible : ${fields.length} renseignement(s) à corriger.</strong><ul>${fields.map(key=>`<li><a href="#record_${esc(key)}">${esc(errors[key])}</a></li>`).join('')}</ul>`;
+ $('#recordErrors').querySelectorAll('a').forEach(a=>a.onclick=e=>{e.preventDefault();document.getElementById(a.hash.slice(1))?.focus();});
+ f.elements[fields[0]]?.focus();
+}
+function refreshTimeSensitive(){
+ if(!user||!ready||document.hidden)return;
+ if(tab==='deliveries')renderTable();else if(tab==='calendar')renderCalendar();else return;
+ const nodes=$('#metrics').querySelectorAll('.metric strong');if(nodes[3])nodes[3].textContent=records.filter(v=>urgentDelivery(v)).length;if(nodes[4])nodes[4].textContent=records.filter(v=>reminderDelivery(v)).length;
+}
+// Actualise immédiatement les alertes après une modification du rendez-vous.
+$('#recordDialog').addEventListener('close',render);
+setInterval(refreshTimeSensitive,30000);
+window.addEventListener('focus',refreshTimeSensitive);
+document.addEventListener('visibilitychange',refreshTimeSensitive);
+function populateDeliveryAssignments(form){
+ if(selectedDealership!=='levis-subaru')return;
+ const normalized=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ const titles={finance:new Set(['directrice services financiers','directeur services financiers']),driver:new Set(['livreur','livreuse'])};
+ for(const [field,allowed]of Object.entries(titles)){
+  const select=form.elements[field];if(select?.tagName!=='SELECT')continue;
+  select.replaceChildren(new Option('Sélectionner (annuaire authentifié)',''));
+  const names=[...new Set(employees.filter(e=>allowed.has(normalized(e.poste))&&e.name?.trim()).map(e=>e.name.trim()))].sort();
+  for(const name of names){const option=new Option(name,name);option.dataset.authenticatedAssignment='true';select.add(option);}select.value='';
+ }
+}
+function openRecord(id,date,sourceSale){const v=id?records.find(v=>v.id===id):null;if(!ready)return;if(!modules.isLoaded()){toast('Les ventes sont en cours de chargement. Réessayez dans un instant.');return;}editing=v?structuredClone(v):null;const f=$('#recordForm');f.reset();populateDeliveryAssignments(f);clearRecordErrors();$('#formError').textContent='';$('#dialogTitle').textContent=v?`${v.stock} · ${v.model}`:'Nouveau dossier';for(const k of ['stock','type','model','color','vin','arrival','location','keys','blocker','notes','prepFinishedOn'])f.elements[k].value=v?.[k]??(k==='arrival'?today():k==='type'?'VO':k==='location'?'Concession':'');f.elements.stock.readOnly=!!v;f.elements.type.disabled=!!v;workingSteps=structuredClone(v?.steps||defaultSteps(f.elements.type.value));const delivery=v?.delivery;for(const field of ['finance','driver'])preserveSelectValue(f.elements[field],delivery?.[field]);f.elements.hasDelivery.checked=!!delivery||!!sourceSale||tab!=='vo';syncDeliveryFields();renderSteps();for(const [field,key]of [['client','client'],['advisor','advisor'],['deliveryDate','date'],['deliveryTime','time'],['deliveryStatus','status'],['actualDate','actualDate'],['driver','driver'],['promises','promises'],['finance','finance'],['parts','parts']])f.elements[field].value=delivery?.[key]??(field==='deliveryDate'?date||today():field==='deliveryTime'?'13:00':field==='deliveryStatus'?'Demandée':['driver','finance'].includes(field)?'':'');syncDeliveryFields();$('#history').innerHTML=(v?.history||[]).slice().reverse().map(h=>`<p>${esc(h.at)} · ${esc(h.by)}<br>${esc(h.message)}</p>`).join('')||'<p>Aucun changement enregistré.</p>';$('#archive').hidden=!v;slotInfo();prepareRecordLinks(v,sourceSale);$('#recordDialog').showModal();}
+function captureSteps(){const f=$('#recordForm');for(const [k] of STEPS.concat([['pieces','Pièces']])){const input=f.elements['step_'+k];if(input)workingSteps[k]={...workingSteps[k],status:input.value,note:f.elements['note_'+k].value.trim(),...(k!=='pieces'?{startedOn:f.elements['startedOn_'+k]?f.elements['startedOn_'+k].value:workingSteps[k]?.startedOn||'',finishedOn:f.elements['finishedOn_'+k]?f.elements['finishedOn_'+k].value:workingSteps[k]?.finishedOn||''}:{})};}}
+function renderSteps(){const f=$('#recordForm'),keys=tab==='vo'&&f.elements.type.value==='VO'?(f.elements.hasDelivery.checked?[...STEPS,['pieces','Pièces']]:STEPS):stepsFor({delivery:f.elements.hasDelivery.checked?{}:null});$('#prepEndLabel').hidden=f.elements.type.value!=='VO';$('#stepsForm').innerHTML=keys.map(([k,label])=>`<div class="step-row"><strong>${label}</strong><label>État<select name="step_${k}">${selectOptions(STATES,workingSteps[k]?.status||'À faire')}</select></label><label class="step-note">Note / travaux restants<input name="note_${k}" value="${esc(workingSteps[k]?.note||'')}" maxlength="1000"></label>${k!=='pieces'?`<label>Début<input name="startedOn_${k}" type="date" max="${today()}" value="${esc(workingSteps[k]?.startedOn||'')}"></label><label>Fin<input name="finishedOn_${k}" type="date" max="${today()}" value="${esc(workingSteps[k]?.finishedOn||'')}"></label>`:''}</div>`).join('');for(const [k]of keys){const el=f.elements['step_'+k];el.onchange=()=>{if(k==='pieces')return;const start=f.elements['startedOn_'+k],end=f.elements['finishedOn_'+k];if(el.value==='En cours'){if(!start.value)start.value=today();end.value='';}if(el.value==='Terminé'&&!end.value)end.value=today();if(['À faire','Non requis'].includes(el.value)){start.value='';end.value='';}};}}
+function slotInfo(){const date=$('#recordForm').elements.deliveryDate.value,items=slots(date,editing?.id);$('#slotInfo').textContent=items.length?`${items.length} autre(s) livraison(s) prévue(s) le ${date} : ${items.map(v=>v.delivery.time+' '+v.stock).join(' · ')}`:'Aucune autre livraison prévue à cette date.';}
+let recordLinkedSale=null;
+function prepareRecordLinks(v,sourceSale){
+ const f=$('#recordForm');recordLinkedSale=sourceSale||(v?modules.findSaleFor(v):null);
+ $('#dossierChoices').innerHTML=records.map(x=>`<option value="${esc(x.stock)}">${esc(x.model)}</option>`).join('');
+ $('#findDossier').onclick=()=>{const key=$('#dossierLookup').value.trim().toUpperCase(),found=records.find(x=>x.stock===key);if(!found){toast('Aucun dossier pour ce stock. Vous pouvez remplir les renseignements ci-dessous.');return;}const delivery=f.elements.hasDelivery.checked;openRecord(found.id,undefined,delivery?modules.findSaleFor(found)||undefined:undefined);if(delivery&&!f.elements.hasDelivery.checked){f.elements.hasDelivery.checked=true;syncDeliveryFields();renderSteps();prepareRecordLinks(found);}};
+ $('#dossierActions').innerHTML=v?'<button type="button" id="openInspection">Inspection</button><button type="button" id="openWorks">Travaux détaillés</button><button type="button" id="openLinkedSale">'+(recordLinkedSale?'Ouvrir la vente':'Ajouter une vente')+'</button>':'';
+ if(v){$('#openInspection').onclick=()=>{$('#recordDialog').close();operations.inspection(v);};$('#openWorks').onclick=()=>{$('#recordDialog').close();operations.works(v);};$('#openLinkedSale').hidden=!canEditObjectives(profile,'vente');$('#openLinkedSale').onclick=()=>{$('#recordDialog').close();modules.openSale(recordLinkedSale?.id,v);};}
+ const panel=$('#recordSalesFields');panel.hidden=!f.elements.hasDelivery.checked||!canEditObjectives(profile,'vente');if(panel.hidden){panel.innerHTML='';return;}
+ const sale=recordLinkedSale,people=modules.sellers(v?.type||f.elements.type.value);
+ panel.innerHTML=`<label class="check"><input id="linkRecordSale" type="checkbox" ${sale||!v?'checked':''} ${sale?'disabled':''}> ${sale?'Vente liée au dossier commun':'Inscrire aussi cette vente au tableau des ventes'}</label><div id="recordSaleDetails" class="form-grid"><label>Conseiller des ventes<select name="recordSeller"><option value="">Sélectionner</option>${people.map(p=>`<option value="${esc(p.id)}" ${sale?.sellerId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label><label>Date de vente signée<input type="date" name="recordSaleDate" max="${today()}" value="${sale?.saleDate||today()}"></label><label>Mode d’achat<select name="recordPayment"><option value="comptant">Comptant</option><option value="financement">Financement</option>${(v?.type||f.elements.type.value)==='VN'?'<option value="location">Location</option>':''}</select></label><label>Motorisation<select name="recordEnergy"><option value="essence">Essence</option><option value="EV">EV</option></select></label></div>`;
+ if(sale){f.elements.recordPayment.value=sale.payment;f.elements.recordEnergy.value=sale.energy||'essence';if(!v?.delivery||sourceSale)f.elements.client.value=sale.client;}
+ const toggle=()=>{const enabled=$('#linkRecordSale').checked;$('#recordSaleDetails').hidden=!enabled;for(const name of ['recordSeller','recordSaleDate','recordPayment','recordEnergy'])f.elements[name].disabled=!enabled;f.elements.recordSeller.required=enabled;f.elements.recordSaleDate.required=enabled;f.elements.advisor.readOnly=enabled;if(enabled){const p=people.find(p=>p.id===f.elements.recordSeller.value);if(p)f.elements.advisor.value=p.name;}};
+ f.elements.recordSeller.onchange=toggle;$('#linkRecordSale').onchange=toggle;toggle();
+}
+function recordSaleInput(vehicle){
+ const f=$('#recordForm');if(!$('#recordDialog').open||!vehicle.delivery||!$('#linkRecordSale')?.checked)return undefined;
+ const seller=modules.sellers(vehicle.type).find(p=>p.id===f.elements.recordSeller.value);if(!seller)throw Error('Sélectionnez le conseiller des ventes.');
+ const sale={...(recordLinkedSale||{}),type:vehicle.type,stock:vehicle.stock,model:vehicle.model,client:vehicle.delivery.client,sellerId:seller.id,sellerName:seller.name,saleDate:f.elements.recordSaleDate.value,payment:f.elements.recordPayment.value,energy:vehicle.type==='VN'?f.elements.recordEnergy.value:'',status:recordLinkedSale?.status||'Vendu'};
+ const errors=saleErrors(sale);if(Object.keys(errors).length)throw Error(Object.values(errors).join(' '));return sale;
+}
+$('#recordForm').elements.type.onchange=e=>{workingSteps=defaultSteps(e.target.value);renderSteps();prepareRecordLinks(editing);};$('#recordForm').elements.hasDelivery.onchange=e=>{captureSteps();syncDeliveryFields();renderSteps();clearRecordErrors();prepareRecordLinks(editing,recordLinkedSale);};$('#recordForm').elements.deliveryDate.onchange=slotInfo;$('#recordForm').elements.deliveryStatus.onchange=e=>{const f=$('#recordForm');if(e.target.value==='Livré'&&!f.elements.actualDate.value)f.elements.actualDate.value=today();syncDeliveryFields();};
+$('#recordForm').onsubmit=async e=>{e.preventDefault();if(busy)return;const f=e.target;$('#formError').textContent='';busy=true;$('#save').disabled=true;try{const data={};for(const k of ['stock','type','model','color','vin','arrival','location','keys','blocker','notes','prepFinishedOn'])data[k]=f.elements[k].value.trim();data.stock=data.stock.toUpperCase();data.vin=data.vin.toUpperCase();captureSteps();data.steps=Object.fromEntries(Object.entries(workingSteps).filter(([k])=>k!=='validation').map(([k,s])=>[k,{...s,status:s.status,note:s.note||''}]));data.delivery=f.elements.hasDelivery.checked?{client:f.elements.client.value.trim(),advisor:f.elements.advisor.value.trim(),date:f.elements.deliveryDate.value,time:f.elements.deliveryTime.value,status:f.elements.deliveryStatus.value,actualDate:f.elements.deliveryStatus.value==='Livré'?f.elements.actualDate.value:'',driver:f.elements.driver.value,promises:f.elements.promises.value.trim(),finance:f.elements.finance.value,parts:f.elements.parts.value.trim()}:null;data.archived=editing?.archived||false;Object.assign(data,stampPreparation(editing,data));const missing={...recordErrors({...editing,...data}),...preparationDateErrors(data)};showRecordErrors(missing);if(Object.keys(missing).length)return;validate({...editing,...data});if(data.delivery?.status==='Prête'&&!complete({...editing,...data}))throw Error('Complétez les étapes avant de confirmer le véhicule prêt.');if(!data.delivery&&editing?.delivery?.status==='Livré')throw Error('Un dossier livré doit conserver sa livraison.');await saveRecord({...data,...(editing?{id:editing.id}: {})},editing?.version,editing?'Dossier modifié':'Dossier créé');$('#recordDialog').close();toast('Dossier enregistré');}catch(e){$('#formError').textContent=message(e);}finally{busy=false;$('#save').disabled=false;}};
+async function saveRecord(data,expected,reason){
+ const old=records.find(v=>v.id===data.id);const result=await dossierService.save({vehicle:{...old,...data,...(data.id?{version:expected}:{})},sale:recordSaleInput(data)});return result.vehicle;
+}
+$('#archive').onclick=async()=>{if(!editing||!confirm('Archiver ce dossier ? Il sera retiré des listes et restera dans les résultats mensuels.'))return;try{await saveRecord({...editing,archived:true},editing.version,'Dossier archivé');$('#recordDialog').close();toast('Dossier archivé');}catch(e){$('#formError').textContent=message(e);}};
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#recordDialog').close());document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(!canViewModule(profile,b.dataset.tab))return;if(b.dataset.tab==='group'){location.href='./groupe/plateforme.html';return;}modules.leave();tab=b.dataset.tab;filter='all';search='';render();});$('#add').onclick=()=>{if(tab==='team'){editingEmployee=null;openTeam();}else openRecord();};
+function exportCSV(){const rows=visible(),fields=['Stock','Catégorie','Véhicule','Arrivée','Emplacement','Clés','Blocage','Livraison prévue','Heure','Statut livraison','Livraison réelle','Couleur','Directrice financière','Pièces livraison','État pièces',...STEPS.map(([,l])=>l)];const data=[fields,...rows.map(v=>[v.stock,v.type,v.model,v.arrival,v.location,v.keys,v.blocker,v.delivery?.date,v.delivery?.time,v.delivery?.status,v.delivery?.actualDate,v.color,v.delivery?.finance,v.delivery?.parts,v.delivery?(v.steps?.pieces?.status||'À faire'):'Non applicable',...STEPS.map(([k])=>k==='photos'&&v.delivery?'Non applicable':(v.steps?.[k]?.status||'À faire'))])];const q=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+data.map(r=>r.map(q).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`levis-subaru-${tab}-${today()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function persistDemo(){localStorage.setItem('levis-demo-synthetic-v2',JSON.stringify({records,goals,team,employees,messages,departmentData}));}
+function seed(){const base={vin:'',keys:'Armoire service · 12',notes:'Dossier fictif pour les essais.',blocker:'',archived:false,version:1,createdAt:new Date().toISOString(),history:[]};return [['U101','2023 Subaru Outback','VO',10,'Mécanique'],['U102','2022 Subaru Crosstrek','VO',6,'Lavage'],['N201','2026 Subaru Forester','VN',2,'Concession']].map(([stock,model,type,days,location],i)=>{const d=dateObj(today());d.setDate(d.getDate()-days);const steps=defaultSteps(type);if(i===1){steps.inspection.status='Terminé';steps.mechanique.status='Terminé';steps.sousTraitance.status='Non requis';steps.lavage.status='En cours';}return {...base,id:'demo-'+i,stock,model,type,arrival:dayKey(d),location,steps,delivery:i===2?{client:'Client démonstration',advisor:'Conseiller démonstration',date:today(),time:'14:00',status:'Demandée',actualDate:'',driver:'Livreur fictif',promises:'Installer les tapis.'}:null};});}
+async function init(){if(demo){const {EMPLOYEES}=await import('./employees.mjs?v=1.21.11');let cached;try{cached=JSON.parse(localStorage.getItem('levis-demo-synthetic-v2'));}catch{}records=cached?.records||seed();goals=cached?.goals||{};user={uid:'demo',email:'demo'};const testRole=new URLSearchParams(location.search).get('profil'),testDept=new URLSearchParams(location.search).get('departement')||'service';profile={name:'Démonstration',role:['dg','directeur','employe'].includes(testRole)?testRole:'admin',department:testDept,active:true,poste:'Profil fictif',sections:testDept==='vente'?['vente:VN','vente:VO']:[testDept+':all'],dealershipId:selectedDealership,dealershipName:'Concession de démonstration'};team=cached?.team||[{uid:'demo',...profile,email:'demo@example.invalid'}];departmentData=cached?.departmentData||{};employees=cached?.employees||structuredClone(EMPLOYEES);messages=cached?.messages||[];ready=true;$('#login').hidden=true;$('#app').hidden=false;$('#demoNote').hidden=false;$('#identity').textContent='Démonstration';$('#connection').textContent='Données locales';render();$('#logout').onclick=()=>location.href=location.pathname;return;}
+try{
+  if(!/^https:\/\/.+\.supabase\.co$/.test(supabaseConfig.url)||!supabaseConfig.publishableKey||supabaseConfig.publishableKey.startsWith('REMPLACER_'))
+    throw Error('Configuration Supabase manquante : renseigner la clé publique dans supabase-config.js.');
+  if(await checkPublishedWorkspace())return;
+  const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm');
+  const client=createClient(supabaseConfig.url,supabaseConfig.publishableKey,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  sdk=createSupabaseBridge(client,{dealershipId:selectedDealership,scoped:true,identity:()=>user||{}});auth=client;db=client;
+  sdk.onSnapshot=subscriptionErrors.wrap(sdk.onSnapshot);
+  const passwordFlow=createPasswordFlow(location.href);
+  client.auth.onAuthStateChange((event,session)=>{
+    const state=passwordFlow.observe(event,session);
+    if(state.show)queueMicrotask(()=>{if(passwordFlow.ready){$('#passwordForm button[type=submit]').disabled=false;const dlg=$('#passwordDialog');if(!dlg.open)dlg.showModal();}});
+    if(state.invalid)queueMicrotask(()=>{$('#passwordDialog').close();$('#loginError').textContent=RECOVERY_EXPIRED;});
+  });
+  $('#passwordDialog').addEventListener('cancel',event=>{if(passwordFlow.pending)event.preventDefault();});
+  const pwForm=$('#passwordForm');
+  pwForm.onsubmit=async ev=>{
+    ev.preventDefault();$('#passwordError').textContent='';
+    if(!passwordFlow.ready){$('#passwordError').textContent=RECOVERY_EXPIRED;return;}
+    const pass=pwForm.elements.password.value;
+    if(pass.length<12){$('#passwordError').textContent='Choisissez au moins 12 caractères.';return;}
+    if(pass!==pwForm.elements.confirmPassword.value){$('#passwordError').textContent='Les deux mots de passe doivent être identiques.';return;}
+    const submit=pwForm.querySelector('[type=submit]');submit.disabled=true;
+    try{
+      const {data,error}=await client.auth.updateUser({password:pass});if(error)throw error;
+      passwordFlow.complete();pwForm.reset();$('#passwordDialog').close();
+      history.replaceState(null,'',cleanPasswordUrl(location.href));
+      toast('Votre nouveau mot de passe est enregistré.');
+      await applyAuthUser(data.user?{uid:data.user.id,email:data.user.email}:null);
+    }catch(error){$('#passwordError').textContent=message(error);}
+    finally{submit.disabled=false;}
+  };
+  const resetForm=$('#resetForm');
+  function showReset(show=true){$('#loginForm').hidden=show;resetForm.hidden=!show;$('#reset').hidden=show;$('#loginError').textContent='';if(show){resetForm.elements.email.value=$('#loginForm').elements.email.value.trim();resetForm.elements.email.focus();}}
+  $('#reset').onclick=()=>showReset();$('#resetBack').onclick=()=>{
+    history.replaceState(null,'',cleanPasswordUrl(location.href));
+    showReset(false);
+  };
+  $('#retrySession').onclick=()=>applyAuthUser(user);$('#sessionLogout').onclick=()=>sdk.signOut(auth);
+  resetForm.onsubmit=async event=>{
+    event.preventDefault();const button=resetForm.querySelector('[type=submit]');button.disabled=true;$('#resetStatus').textContent='';
+    try{await sdk.sendPasswordResetEmail(auth,resetForm.elements.email.value.trim());$('#resetStatus').textContent='Si ce compte existe, un courriel de récupération sera envoyé. Ouvrez le lien le plus récent pour choisir votre nouveau mot de passe, sans saisir l’ancien.';}
+    catch(error){$('#resetStatus').textContent=message(error);}finally{button.disabled=false;}
+  };
+  if(new URLSearchParams(location.search).get('recuperation')==='1'||passwordFlow.invalid)showReset();
+$('#loginForm').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;$('#loginError').textContent='';try{await sdk.signInWithEmailAndPassword(auth,f.elements.email.value.trim(),f.elements.password.value);f.elements.password.value='';}catch(e){$('#loginError').textContent=message(e);}finally{b.disabled=false;}};$('#logout').onclick=()=>sdk.signOut(auth);
+let authGeneration=0;
+async function applyAuthUser(next){
+if(next&&user?.uid===next.uid&&profile?.active===true){user=next;return;}
+for(const option of document.querySelectorAll('[data-authenticated-assignment],[data-preserved-assignment]'))option.remove();
+const generation=++authGeneration;if(passwordFlow.pending&&next){user=next;ready=false;return;}workspacePilotage.clear();workspacePilotageKey='';workspacePilotageData=null;workspacePilotageGeneration++;modules.stop();operations.stop();billing.stop();central.stop();$('#app').hidden=true;$('#content').innerHTML='';$('#metrics').innerHTML='';document.querySelectorAll('dialog[open]').forEach(d=>d.close());profile=null;unsubs.forEach(fn=>fn());unsubs=[];metricUnsubs.forEach(fn=>fn());metricUnsubs=[];metricYear='';user=next;ready=false;records=[];goals={};departmentData={};team=[];employees=[];messages=[];subscriptionErrors.reset();$('#retrySession').hidden=true;$('#sessionLogout').hidden=!next;$('#sessionNotice').hidden=!next;
+if(!next){$('#login').hidden=false;$('#app').hidden=true;$('#loginForm').hidden=!$('#resetForm').hidden;$('#reset').hidden=!$('#resetForm').hidden;return;}
+$('#loginForm').hidden=true;$('#resetForm').hidden=true;$('#reset').hidden=true;$('#sessionNotice').textContent='Connexion validée. Chargement de votre espace…';$('#loginError').textContent='';
+try{if(await checkPublishedWorkspace())return;if(generation!==authGeneration)return;if(!new URLSearchParams(location.search).has('concession')){const access=await readAccessContext(client);if(!access.memberships.some(m=>m.dealership_id===selectedDealership)){if(access.memberships.length){location.replace('?concession='+encodeURIComponent(access.memberships[0].dealership_id));return;}if(access.canReadGroup){location.replace('./groupe/plateforme.html');return;}}}const snap=await sdk.getDoc(sdk.doc(db,'users',next.uid));if(generation!==authGeneration)return;if(!snap.exists()||snap.data().active!==true||!['admin','dg','directeur','employe'].includes(snap.data().role))throw Error('Votre compte n’a pas accès à la plateforme. Contactez votre administrateur.');profile=snap.data();tab=initialWorkspaceView(profile,location.search);const route=new URLSearchParams(location.search),routeMonth=route.get('month'),routeDepartment=route.get('department');if(/^\d{4}-(0[1-9]|1[0-2])$/.test(routeMonth||''))calendarDate=dateObj(routeMonth+'-01');if(canViewSubcategory(profile,'settings',routeDepartment))objectiveView=routeDepartment;await applyDealerContext(await readAccessContext(client));if(generation!==authGeneration)return;if(profile.invitationStatus==='pending'){await sdk.setDoc(sdk.doc(db,'users',next.uid),{invitationStatus:'active',lastLoginAt:new Date().toISOString()},{merge:true});profile.invitationStatus='active';}$('#identity').textContent=profile.name||next.email;$('#login').hidden=true;$('#app').hidden=false;$('#connection').textContent='Synchronisation…';render();unsubs.push(sdk.onSnapshot(sdk.collection(db,'vehicles'),snap=>{records=snap.docs.map(d=>({...d.data(),id:d.id}));ready=true;$('#connection').textContent=navigator.onLine?'Données synchronisées':'Hors ligne : données en cache';render();},fail));if(canViewSubcategory(profile,'settings','vente'))unsubs.push(sdk.onSnapshot(sdk.collection(db,'goals'),snap=>{goals=Object.fromEntries(snap.docs.map(d=>[d.id,d.data()]));render();},fail));if(canViewTeam(profile,'users'))unsubs.push(sdk.onSnapshot(sdk.collection(db,'employees'),s=>{employees=s.docs.map(d=>({...d.data(),id:d.id}));render();},fail));if(canViewTeam(profile,'messages'))unsubs.push(sdk.onSnapshot(sdk.collection(db,'messages'),s=>{messages=s.docs.map(d=>({...d.data(),id:d.id}));render();},fail));/* Les 38 employés ont déjà été migrés : pas de réensemencement automatique. */if(canManageAccess(profile))unsubs.push(sdk.onSnapshot(sdk.collection(db,'users'),s=>{team=s.docs.map(d=>({...d.data(),uid:d.id}));render();},fail));unsubs.push(sdk.onSnapshot(sdk.doc(db,'users',next.uid),s=>{if(!s.exists()||!s.data().active||!['admin','dg','directeur','employe'].includes(s.data().role))sdk.signOut(auth);else{const updated=s.data(),changed=JSON.stringify(profile.permissions||{})!==JSON.stringify(updated.permissions||{})||profile.role!==updated.role||profile.department!==updated.department||JSON.stringify(profile.sections)!==JSON.stringify(updated.sections)||profile.canReadGroup!==updated.canReadGroup||profile.reportingEnabled!==updated.reportingEnabled;if(changed){location.reload();return;}profile=updated;$('#identity').textContent=(profile.name||next.email)+(profile.poste?' · '+profile.poste:'');render();}},fail));}catch(e){
+ if(generation!==authGeneration)return;
+ workspacePilotage.clear();workspacePilotageKey='';workspacePilotageData=null;workspacePilotageGeneration++;modules.stop();operations.stop();billing.stop();central.stop();unsubs.forEach(fn=>fn());unsubs=[];metricUnsubs.forEach(fn=>fn());metricUnsubs=[];metricYear='';
+ ready=false;profile=null;records=[];goals={};departmentData={};team=[];employees=[];messages=[];
+ $('#app').hidden=true;$('#login').hidden=false;$('#content').innerHTML='';$('#metrics').innerHTML='';
+ $('#sessionNotice').textContent='Votre connexion est validée, mais votre espace n’a pas pu être chargé.';$('#sessionNotice').hidden=false;$('#retrySession').hidden=false;$('#sessionLogout').hidden=false;
+ $('#loginError').textContent=message(e);
+}
+}
+sdk.onAuthStateChanged(auth,applyAuthUser);
+$('#loginForm button[type=submit]').disabled=false;$('#resetForm button[type=submit]').disabled=false;$('#reset').disabled=false;$('#authLoading').hidden=true;
+const updateWorkspace=()=>{if(!document.hidden&&!user&&!passwordFlow.pending&&![...document.querySelectorAll('#login input')].some(input=>input.value))checkPublishedWorkspace();};
+const releaseTimer=setInterval(updateWorkspace,30000);document.addEventListener('visibilitychange',updateWorkspace);window.addEventListener('pagehide',()=>clearInterval(releaseTimer),{once:true});
+}catch(e){$('#loginError').textContent='Impossible de charger Supabase. Vérifiez la configuration et Internet. '+message(e);}}
+window.addEventListener('offline',()=>{if(!demo)$('#connection').textContent='Hors ligne : reconnectez-vous avant d’enregistrer';});window.addEventListener('online',()=>{if(!demo)$('#connection').textContent='Connexion rétablie';});
+
+let editingUser=null;
+function renderSidebars(){for(const group of Object.keys(SUBMENUS)){const views=availableSubcategories(profile,group),parent=document.querySelector(`[data-tab="${group}"]`);if(!parent)continue;parent.hidden=!views.length;const sub=$(group==='team'?'#teamSubnav':'#objectiveSubnav');sub.hidden=tab!==group||!views.length;const selected=group==='team'?teamView:objectiveView;sub.innerHTML=views.map(([k,label])=>`<button data-subcategory="${k}" class="${selected===k?'selected':''}">${group==='team'&&k==='organigramme'&&selectedDealership!=='levis-subaru'?'Équipe par département':label}</button>`).join('');sub.querySelectorAll('[data-subcategory]').forEach(b=>b.onclick=()=>{const key=b.dataset.subcategory;if(!canViewSubcategory(profile,group,key))return;modules.leave();if(group==='team')teamView=key;else objectiveView=key;tab=group;render();});}}
+function subscribeMetrics(){
+ if(demo||!db||!profile||tab!=='settings')return;
+ const year=monthKey().slice(0,4);
+ if(metricYear===year)return;
+ metricUnsubs.forEach(fn=>fn());metricUnsubs=[];
+ metricYear=year;departmentData={};
+ const allowed=new Set(availableSubcategories(profile,'settings').map(([key])=>key));
+ if(!allowed.size)return;
+ // Un abonnement par année plutôt que 12 par département.
+ metricUnsubs.push(sdk.onSnapshot(sdk.collection(db,'departmentMetrics'),snap=>{
+   departmentData=Object.fromEntries(snap.docs
+     .filter(d=>allowed.has(d.id.split('_')[0])&&d.id.split('_')[1]?.startsWith(year+'-'))
+     .map(d=>[d.id,d.data()]));
+   if(tab==='settings')render();
+ },fail));
+}
+function teamShell(content){$('#metrics').innerHTML='';$('#content').innerHTML=content;}
+function renderTeam(){
+ if(!canViewTeam(profile,teamView))return;
+ if(teamView==='organigramme'&&selectedDealership!=='levis-subaru'){teamShell('');mountDepartmentDirectory($('#content'),employeeDepartmentGroups(employees));return;}if(teamView==='organigramme'){teamShell('<p>Le document d’organigramme n’est pas disponible dans cette version protégée. Aucun lien hiérarchique n’est déduit.</p><button id="openAuthenticatedDirectory" type="button">Consulter l’annuaire authentifié</button>');$('#openAuthenticatedDirectory').onclick=()=>{if(!canViewTeam(profile,'users'))return;teamView='users';render();};return;}
+ if(teamView==='messages'){renderMessages();return;}
+ if(accessReadinessOpen&&canManageAccess(profile)){$('#add').hidden=true;teamShell('');mountRosterReadiness($('#content'),{employees,accounts:team,dealershipLabel:profile.dealershipName||selectedDealership,onBack:()=>{accessReadinessOpen=false;render();}});return;}
+ if(inviteDraft&&canManageAccess(profile)){renderInvitations();return;}
+ const admin=canManageAccess(profile);let html=admin?'<div class="toolbar"><button id="accessReadiness" type="button">Préparation des accès</button><button id="openInvites" class="primary">Invitations en lot</button><span class="muted">Ajouter les courriels, choisir les profils, puis envoyer les invitations.</span></div>':'';
+ for(const {key:k,label,rows}of employeeDepartmentGroups(employees)){
+  html+=`<h3>${label}</h3><div class="table-wrap"><table><thead><tr><th>Nom</th><th>Poste</th><th>Courriel</th><th>Accès</th><th></th></tr></thead><tbody>${rows.map(e=>{const account=team.find(u=>u.uid===e.uid);const canInvite=admin&&!demo&&location.pathname==='/levis-subaru/'&&validEmail(e.email)&&Object.hasOwn(DEPARTMENTS,e.department)&&account?.invitationStatus!=='active';return `<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.poste)}</td><td>${esc(e.email||'À compléter')}</td><td>${e.uid?(account?.active===false?'Inactif':account?.invitationStatus==='active'?'Connecté':e.invitationStatus==='sent'?'Invitation envoyée':'Compte créé'):'À créer'}${admin?'<small>'+esc(ROLES[account?.role||e.accessRole]||'Employé')+'</small>':''}</td><td><button data-employee="${esc(e.id)}">Modifier</button>${canInvite?` <button type="button" data-employee-invite="${esc(e.id)}">Envoyer invitation</button>`:""}</td></tr>`;}).join('')||'<tr><td colspan="5">Aucun employé renseigné.</td></tr>'}</tbody></table></div>`;
+ }
+ if(admin){const linked=new Set(employees.map(e=>e.uid));html+='<h3>Autres comptes existants</h3>'+team.filter(u=>!linked.has(u.uid)).map(u=>`<p>${esc(u.name)} · ${esc(u.poste||'Poste à préciser')} <button data-user="${esc(u.uid)}">Modifier</button></p>`).join('');}
+ teamShell(html);if(admin)$('#accessReadiness').onclick=()=>{accessReadinessOpen=true;inviteDraft=null;render();};if(admin)$('#openInvites').onclick=()=>{inviteDraft=employees.map(e=>{const a=team.find(u=>u.uid===e.uid);return {...e,email:a?.email||e.email||'',role:a?.role||e.accessRole||'employe',department:a?.department||e.department,selected:!e.uid&&validEmail(e.email)};});render();};
+ document.querySelectorAll('[data-employee]').forEach(b=>b.onclick=()=>openEmployee(b.dataset.employee));
+ document.querySelectorAll('[data-employee-invite]').forEach(b=>b.onclick=async()=>{
+   const employee=employees.find(e=>e.id===b.dataset.employeeInvite);
+   if(!employee||!validEmail(employee.email)||!Object.hasOwn(DEPARTMENTS,employee.department)||!canManageAccess(profile))return;
+   b.disabled=true;
+   try{
+     const role=employee.accessRole||'employe';
+     const result=await sdk.inviteEmployee({...employee,role});
+     if(result?.invitationStatus!=='sent')throw Error('Envoi non confirmé par le serveur.');
+     toast('Invitation envoyée à '+employee.email);
+   }catch(error){fail(error);}
+   finally{b.disabled=false;}
+ });
+ document.querySelectorAll('[data-user]').forEach(b=>b.onclick=()=>{editingEmployee=null;openTeam(b.dataset.user);});
+}
+function openEmployee(id){editingEmployee=employees.find(e=>e.id===id)||null;openTeam(editingEmployee?.uid);const f=$('#teamForm');if(editingEmployee){if(editingEmployee.department&&!Object.hasOwn(DEPARTMENTS,editingEmployee.department))f.elements.department.insertAdjacentHTML('afterbegin','<option value="'+esc(editingEmployee.department)+'">À préciser : '+esc(editingEmployee.department)+'</option>');for(const k of ['name','poste','email','department'])f.elements[k].value=editingEmployee[k]||'';if(!editingUser)f.elements.role.value=editingEmployee.accessRole||'employe';$('#teamTitle').textContent='Modifier un employé';updateAccessExplanation();}}
+function updateAccessExplanation(){const f=$('#teamForm'),role=f.elements.role.value,dep=f.elements.department.value;$('#accessExplanation').textContent=role==='admin'?'Administrateur : tous les objectifs, toutes les sections et gestion des accès.':role==='directeur'?'Directeur : KPI de '+(DEPARTMENTS[dep]||'son département')+' et accès commun aux autres sections.':'Employé : consultation et modification des sections communes. Aucun accès aux KPI.';}
+function openTeam(uid){
+ const admin=canManageAccess(profile);if(!admin&&!editingEmployee&&uid)return;
+ editingUser=uid?team.find(u=>u.uid===uid)||null:null;
+ const f=$('#teamForm');f.reset();$('#teamError').textContent='';$('#teamTitle').textContent=uid?'Modifier un utilisateur':'Ajouter un employé';
+ f.elements.department.innerHTML='<option value="">À préciser</option>'+Object.entries(DEPARTMENTS).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+ for(const k of ['name','poste','email','role','department'])f.elements[k].value=editingUser?.[k]||(k==='role'?'employe':'');
+ f.elements.active.checked=editingUser?.active??true;f.elements.role.disabled=!admin||uid===user.uid;f.elements.active.disabled=!admin||uid===user.uid;
+ $('#roleField').hidden=!admin;$('#activeField').hidden=!admin;f.elements.email.readOnly=!!uid&&admin;
+ f.elements.role.onchange=f.elements.department.onchange=updateAccessExplanation;updateAccessExplanation();
+ f.dataset.employeeId='';
+ $('#teamSaveAndInvite').hidden=!admin||demo||location.pathname!=='/levis-subaru/'||uid===user.uid;
+ $('#teamDialog').showModal();
+}
+function renderMessages(){
+ const options='<option value="all">À tous</option>'+Object.entries(DEPARTMENTS).map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+ teamShell(`<div class="settings"><h2>Messages internes</h2><form id="messageForm"><label>Destinataires<select name="target">${options}</select></label><label>Message<textarea name="body" required maxlength="3000" rows="4"></textarea></label><button class="primary">${editingMessage?'Enregistrer la modification':'Publier le message'}</button>${editingMessage?'<button type="button" id="cancelMessage">Annuler</button>':''}</form></div><div class="toolbar"><label>Afficher<select id="messageFilter"><option value="any">Tous les messages</option>${options}</select></label></div><div id="messageList"></div>`);
+ if(editingMessage){$('#messageForm').elements.body.value=editingMessage.body;$('#messageForm').elements.target.value=editingMessage.target;$('#cancelMessage').onclick=()=>{editingMessage=null;render();};}
+ const list=()=>{const target=$('#messageFilter').value;const items=messages.filter(m=>target==='any'||m.target===target).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));$('#messageList').innerHTML=items.map(m=>`<article class="message-card"><small>${m.target==='all'?'À tous':esc(DEPARTMENTS[m.target])} · ${esc(m.authorName)} · ${esc(new Date(m.createdAt).toLocaleString('fr-CA'))}${m.modifiedAt?' · modifié':''}</small><p>${esc(m.body).replace(/\n/g,'<br>')}</p><button data-edit-message="${esc(m.id)}">Modifier</button></article>`).join('')||'<p class="muted">Aucun message.</p>';document.querySelectorAll('[data-edit-message]').forEach(b=>b.onclick=()=>{editingMessage=messages.find(m=>m.id===b.dataset.editMessage);renderMessages();});};
+ $('#messageFilter').onchange=list;list();$('#messageForm').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('button');b.disabled=true;try{const data={target:f.elements.target.value,body:f.elements.body.value.trim()};if(!data.body)throw Error('Inscrivez un message.');if(editingMessage){Object.assign(data,{modifiedAt:new Date().toISOString(),modifiedBy:user.uid});if(demo){messages=messages.map(m=>m.id===editingMessage.id?{...m,...data}:m);persistDemo();}else await sdk.setDoc(sdk.doc(db,'messages',editingMessage.id),data,{merge:true});}else{Object.assign(data,{authorId:user.uid,authorName:profile.name||user.email,createdAt:new Date().toISOString()});if(demo){messages.push({...data,id:newId()});persistDemo();}else await sdk.setDoc(sdk.doc(sdk.collection(db,'messages')),data);}editingMessage=null;toast('Message enregistré');render();}catch(err){fail(err);}finally{b.disabled=false;}};
+}
+$('#teamClose').onclick=$('#teamCancel').onclick=()=>$('#teamDialog').close();
+$('#teamForm').onsubmit=async e=>{
+ e.preventDefault();const f=e.target,btn=$('#teamSave'),inviteButton=$('#teamSaveAndInvite'),admin=canManageAccess(profile);
+ const sendInvitation=e.submitter?.id==='teamSaveAndInvite';
+ if(sendInvitation&&(!admin||demo||location.pathname!=='/levis-subaru/'))return;
+ btn.disabled=true;inviteButton.disabled=true;$('#teamError').textContent='';
+ try{
+  const data={name:f.elements.name.value.trim(),poste:f.elements.poste.value.trim(),email:f.elements.email.value.trim().toLowerCase(),department:f.elements.department.value};
+  if(!data.name||!data.poste)throw Error('Le nom et le poste sont obligatoires.');if(data.email&&!validEmail(data.email))throw Error('Courriel invalide.');
+  const access={role:admin?f.elements.role.value:'employe',active:f.elements.active.checked};
+  if(admin&&access.role==='directeur'&&!['vente','service','piece','esthetique'].includes(data.department))throw Error('Choisissez le département KPI du directeur.');
+  if(editingUser?.uid===user.uid){access.role='admin';access.active=true;}
+  if((sendInvitation||editingUser)&&!Object.hasOwn(DEPARTMENTS,data.department))throw Error('Précisez le département avant de modifier un compte ou d’envoyer une invitation.');
+  if(sendInvitation&&!validEmail(data.email))throw Error('Ajoutez une adresse courriel valide pour envoyer une invitation.');
+  const id=editingEmployee?.id||f.dataset.employeeId||('custom-'+newId()),employeeData={...data,...(admin?{accessRole:access.role}:{})};
+  f.dataset.employeeId=id;
+  if(editingUser){if(demo)team=team.map(u=>u.uid===editingUser.uid?{...u,...data,...access}:u);else await sdk.setDoc(sdk.doc(db,'users',editingUser.uid),{...data,...access,updatedAt:new Date().toISOString()},{merge:true});employeeData.uid=editingUser.uid;}
+  if(demo){const exists=employees.find(e=>e.id===id);employees=exists?employees.map(e=>e.id===id?{...e,...employeeData}:e):[...employees,{id,...employeeData}];persistDemo();}
+  else await sdk.setDoc(sdk.doc(db,'employees',id),employeeData,{merge:true});
+  if(sendInvitation){
+    const result=await sdk.inviteEmployee({id,...employeeData,role:access.role});
+    if(result?.invitationStatus!=='sent')throw Error('Supabase n’a pas confirmé l’envoi.');
+  }
+  editingEmployee=null;$('#teamDialog').close();
+  toast(sendInvitation?'Fiche enregistrée et invitation envoyée.':'Fiche enregistrée');render();
+ }catch(err){$('#teamError').textContent=message(err);}finally{btn.disabled=false;inviteButton.disabled=false;}
+};
+function renderInvitations(){
+ if(!canManageAccess(profile))return;document.querySelectorAll('[data-tab],[data-subcategory]').forEach(b=>b.disabled=inviting);$('#logout').disabled=inviting;$('#add').disabled=inviting;const disabled=inviting?'disabled':'';
+ const rows=inviteDraft.map((e,i)=>{const a=team.find(u=>u.uid===e.uid);const state=e.result||(a?.invitationStatus==='active'?'Connecté':e.invitationStatus==='pending'?'Activation à compléter':e.invitationStatus==='error'?'Invitation à reprendre':e.uid?'Compte créé':!e.email?'Courriel à compléter':'À inviter');return `<tr><td><input type="checkbox" aria-label="Inviter ${esc(e.name)}" data-invite-select="${i}" ${e.selected?'checked':''} ${disabled}></td><td><strong>${esc(e.name)}</strong><small>${esc(e.poste)}</small></td><td><input aria-label="Courriel de ${esc(e.name)}" data-invite-email="${i}" type="email" value="${esc(e.email)}" ${e.uid?'readonly':''} ${disabled}></td><td><select aria-label="Département de ${esc(e.name)}" data-invite-department="${i}" ${disabled}><option value="" ${!Object.hasOwn(DEPARTMENTS,e.department)?'selected':''}>À préciser</option>${Object.entries(DEPARTMENTS).map(([k,l])=>`<option value="${k}" ${k===e.department?'selected':''}>${l}</option>`).join('')}</select></td><td><select aria-label="Profil de ${esc(e.name)}" data-invite-role="${i}" ${disabled} ${e.uid===user.uid?'disabled':''}>${Object.entries(ROLES).map(([k,l])=>`<option value="${k}" ${k===e.role?'selected':''}>${l}</option>`).join('')}</select></td><td class="invite-state">${esc(state)}</td></tr>`;}).join('');
+ teamShell(`<div class="toolbar"><button id="closeInvites" ${disabled}>← Utilisateurs</button><h2>Invitations en lot</h2></div><p>Complétez les adresses ou collez une liste depuis Excel. Vérifiez les profils et cochez les destinataires. Entrez les courriels des employés et envoyez leurs invitations directement depuis la plateforme. Chaque employé recevra son propre lien d’activation.</p><details class="roster-import"><summary>Coller une liste depuis Excel ou CSV</summary><p>Colonnes : Nom ; Courriel ; Département ; Poste ; Profil (employe, directeur ou admin).</p><textarea id="rosterText" rows="4" placeholder="Nom;Courriel;Département;Poste;Profil" ${disabled}></textarea><button id="importRoster" ${disabled}>Préparer la liste</button></details><div class="toolbar"><button id="selectInvites" ${disabled}>Cocher les adresses complétées</button><button id="saveRoster" ${disabled}>Enregistrer la liste</button><button id="sendInvites" class="primary" ${disabled}>${demo?'Simuler les invitations sélectionnées':location.pathname==='/levis-subaru/'?'Envoyer les invitations':'Invitations désactivées sur le site test'}</button></div><p class="muted">Les invitations sont envoyées automatiquement par le serveur de courriel configuré dans Supabase. Vous n’avez pas à ouvrir Outlook ni copier de lien. Maximum 50 personnes par lot.</p><p id="inviteError" role="alert" class="error"></p><p id="inviteProgress" role="status">${inviting?'Envoi en cours…':''}</p><div class="table-wrap invitation-table"><table><thead><tr><th>Inviter</th><th>Employé</th><th>Courriel</th><th>Département</th><th>Profil</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+ $('#closeInvites').onclick=()=>{inviteDraft=null;render();};
+ for(const [attr,key,kind]of [['email','email','input'],['department','department','change'],['role','role','change'],['select','selected','change']])document.querySelectorAll('[data-invite-'+attr+']').forEach(input=>input.addEventListener(kind,()=>{const row=inviteDraft[Number(input.getAttribute('data-invite-'+attr))];row[key]=key==='selected'?input.checked:key==='email'?input.value.trim().toLowerCase():input.value;}));
+ $('#selectInvites').onclick=()=>{for(const e of inviteDraft)e.selected=validEmail(e.email);renderInvitations();};
+ $('#importRoster').onclick=()=>{try{const rows=parseRoster($('#rosterText').value,employees);const merged=new Map(inviteDraft.map(e=>[e.id,e]));for(const row of rows){const existing=merged.get(row.id);if(existing?.uid===user.uid)row.role='admin';if(existing?.uid&&existing.email!==row.email)throw Error(row.name+' : le courriel du compte existant ne peut pas être remplacé par import.');merged.set(row.id,{...existing,...row});}inviteDraft=[...merged.values()];renderInvitations();}catch(err){$('#inviteError').textContent=message(err);}};
+ $('#saveRoster').onclick=async()=>{try{await saveRosterDraft(inviteDraft.filter(e=>e.email.trim()));toast('Liste enregistrée');renderInvitations();}catch(err){$('#inviteError').textContent=message(err);}};
+ $('#sendInvites').onclick=sendSelectedInvitations;
+ if(!demo&&location.pathname!=='/levis-subaru/')$('#sendInvites').disabled=true;
+
+}
+async function saveRosterDraft(rows){
+ if(!canManageAccess(profile))throw Error('Accès administrateur requis.');const errors=draftErrors(rows);if(errors.length)throw Error(errors.join('\n'));
+ for(const e of rows){const existing=team.find(u=>u.email?.toLowerCase()===e.email.toLowerCase()&&u.uid!==e.uid);if(existing)throw Error(e.name+' : ce courriel est déjà associé à un autre compte de la plateforme.');}
+ for(const e of rows){
+  if(e.uid===user.uid)e.role='admin';
+  const data={name:e.name,poste:e.poste,email:e.email.toLowerCase(),department:e.department,accessRole:e.role};
+  if(demo){const old=employees.find(x=>x.id===e.id);employees=old?employees.map(x=>x.id===e.id?{...x,...data}:x):[...employees,{id:e.id,...data}];if(e.uid)team=team.map(u=>u.uid===e.uid?{...u,...data,role:e.role}:u);persistDemo();}
+  else{await sdk.setDoc(sdk.doc(db,'employees',e.id),data,{merge:true});if(e.uid)await sdk.setDoc(sdk.doc(db,'users',e.uid),{name:e.name,poste:e.poste,email:e.email.toLowerCase(),department:e.department,role:e.role},{merge:true});}
+ }
+}
+async function sendSelectedInvitations(){
+ if(inviting||!canManageAccess(profile))return;
+ if(!demo&&location.pathname!=='/levis-subaru/'){
+   $('#inviteError').textContent='Les invitations ne peuvent être créées que depuis le site officiel.';return;
+ }const selected=inviteDraft.filter(e=>e.selected);
+ try{
+  if(!selected.length)throw Error('Cochez les destinataires.');if(selected.length>50)throw Error('Sélectionnez au maximum 50 personnes par lot.');const errors=draftErrors(selected);if(errors.length)throw Error(errors.join('\n'));
+  inviting=true;renderInvitations();await saveRosterDraft(selected);let sent=0;
+  for(const e of selected){
+   e.result='Envoi en cours…';renderInvitations();
+   try{
+    const account=e.uid?team.find(u=>u.uid===e.uid):null;
+    if(account?.active===false)throw Error('Compte inactif : réactivez-le avant de l’inviter.');
+    let result;
+    if(demo){const uid=e.uid||newId();if(!e.uid)team.push({uid,name:e.name,poste:e.poste,email:e.email,department:e.department,role:e.role,active:true,invitationStatus:'pending'});result={uid,invitationStatus:'sent'};}
+    else result=await sdk.inviteEmployee(e);
+    e.uid=result.uid;e.invitationStatus=result.invitationStatus;
+    e.result=demo?'Invitation simulée':'Invitation envoyée';sent++;
+    if(demo){employees=employees.map(x=>x.id===e.id?{...x,uid:e.uid,invitationStatus:e.invitationStatus}:x);persistDemo();}
+   }catch(error){if(error.accountUid)e.uid=error.accountUid;e.result='Échec : '+message(error);}
+   e.selected=false;
+  }
+  inviting=false;renderInvitations();$('#inviteProgress').textContent=`${sent} / ${selected.length} invitation(s) ${demo?'simulée(s)':'envoyée(s) par Supabase'}. Consultez les résultats pour chaque employé.`;
+ }catch(error){inviting=false;renderInvitations();$('#inviteError').textContent=message(error);}
+}
+
+async function applyDealerContext(scope){
+ const m=scope.memberships.find(m=>m.dealership_id===selectedDealership);if(!m)throw Error('Votre compte n’a pas accès à cette concession.');
+
+ const memberships=scope.memberships.map(m=>({id:m.dealership_id,name:m.name,reporting_enabled:m.reporting_enabled}));
+ let readable=memberships;if(scope.canReadGroup)try{readable=await createCentralReporting(db).dealerships();}catch{toast('La liste des autres concessions n’a pas pu être chargée. Actualisez la page.');}
+ if(scope.userId!==user?.uid)return;workspaceScope=scope;
+ applyPlatformBrand(selectedDealership);document.title=m.name+' · Groupe Couture';document.querySelector('main>header .eyebrow').textContent=m.name+' / OPÉRATIONS';
+ const choices=workspaceNavigation(scope,readable);document.querySelector('#concessionPicker')?.closest('label').remove();
+ const label=document.createElement('label');label.className='workspace-picker';label.textContent='Concession';const pick=document.createElement('select');pick.id='concessionPicker';pick.setAttribute('aria-label','Choisir une concession autorisée');
+ pick.innerHTML=choices.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+(d.destination==='reports'?' · rapports':'')+'</option>').join('');pick.value=selectedDealership;pick.onchange=()=>{const item=choices.find(d=>d.id===pick.value);if(item)location.href=platformDestination(item);};label.append(pick);document.querySelector('aside>.brand').after(label);
+ if(selectedDealership!=='levis-subaru'){enableManualDeliveryAssignments($('#recordForm'));document.querySelector('main>footer').firstChild.textContent=m.name+' · Version '+APP_VERSION+' ';}
+}
+let workspaceScope=null,workspacePilotageKey='',workspacePilotageData=null,workspacePilotageGeneration=0;
+const workspacePilotage=createPilotageUI({onMonth:m=>{calendarDate=dateObj(m+'-01');},onObjectives:({month,department})=>{calendarDate=dateObj(month+'-01');tab='settings';objectiveView=({vn:'vente',vo:'vente',service:'service',parts:'piece'}[department]||'vente');render();if(objectiveView==='vente'){const form=$('#goalForm');form?.closest('details')?.setAttribute('open','');form?.scrollIntoView({block:'center'});}},onReport:({department,month,preferredKind,preferredSource})=>{const source=preferredSource||(workspacePilotageData?.submissions.some(s=>s.snapshot?.endDate?.startsWith(month))?'official':'history');location.href='./groupe/plateforme.html?screen=reports&concession='+encodeURIComponent(selectedDealership)+'&source='+source+'&department='+department+'&month='+month+'&view='+(preferredKind||(['service','parts'].includes(department)||source==='official'?'monthly_final':'month_to_date'));}});
+function renderWorkspacePilotage(){
+ $('#pageTitle').textContent='Pilotage de la concession';$('#subtitle').textContent='Objectifs du mois et de l’année · priorités et actions à suivre';$('#add').hidden=true;$('#metrics').innerHTML='';$('#toolbar').innerHTML='<button id="workspaceResultsReload">Actualiser les résultats</button><button id="workspacePreparation">Préparation VO</button><button id="workspaceDeliveries">Livraisons</button><button id="workspaceReports">Compléter / valider les rapports</button>';
+ $('#workspaceResultsReload').onclick=()=>{workspacePilotageKey='';render();};for(const [id,next]of [['workspacePreparation','vo'],['workspaceDeliveries','deliveries'],['workspaceReports','reports']])$('#'+id).onclick=()=>{tab=next;render();};
+ $('#content').innerHTML='<div id="workspacePilotage"></div>';const target=$('#workspacePilotage'),key=user.uid+'|'+selectedDealership+'|'+monthKey().slice(0,4);
+ if(demo){target.innerHTML='<p class="notice">L’accueil de pilotage utilise les données du serveur dans la plateforme connectée.</p>';return;}
+ if(workspacePilotageKey===key&&workspacePilotageData){workspacePilotage.mount(target,{dealershipId:selectedDealership,month:monthKey()});return;}
+ if(workspacePilotageKey===key){target.textContent='Chargement du pilotage…';return;}
+ workspacePilotageKey=key;const token=++workspacePilotageGeneration,api=createCentralReporting(sdk.client);target.textContent='Chargement des résultats autorisés…';
+ Promise.all([api.dealerships(),api.history(selectedDealership),api.submissions(selectedDealership)]).then(([dealerships,history,submissions])=>{if(token!==workspacePilotageGeneration||key!==workspacePilotageKey)return;workspacePilotageData={dealerships,history,submissions,access:workspaceScope,management:createManagementApi(sdk.client)};workspacePilotage.update(workspacePilotageData);if(tab==='home')render();}).catch(e=>{if(token!==workspacePilotageGeneration)return;workspacePilotageKey='';if(tab==='home'&&$('#workspacePilotage'))$('#workspacePilotage').textContent='Chargement impossible : '+e.message;});
+}
+const central=createCentralReportingUI({state:()=>({profile,user,demo,sdk}),render,toast});
+const modules=createModules({state:()=>({profile,user,demo,sdk,db,tab,month:monthKey(),records,employees,goals,departmentData,objectiveView,teamView}),render,fail,toast,setMonth:m=>{calendarDate=dateObj(m+'-01');},navigate:(next,sub)=>{if(next==='group'){location.href='./groupe/plateforme.html';return;}modules.leave();tab=next;if(next==='settings'&&sub)objectiveView=sub;if(next==='team'&&sub)teamView=sub;filter='all';search='';render();},renderLegacySettings:renderSettings,getProducts:()=>operations.getProducts(),getWholesale:()=>operations.getWholesale(),operationsStatus:()=>operations.status(),renderSalesTools:view=>operations.renderSalesTools(view),selectedProducts:(ids,old)=>operations.selectedProducts(ids,old),saveSale:(sale,financials)=>dossierService.save({sale,financials}),prepareSale:(vehicle,sale)=>openRecord(vehicle.id,undefined,sale)});
+const dossierService=createDossierService({state:()=>({profile,user,demo,sdk,db,records,sales:modules.allSales()}),accept:(plan,financials)=>{records=records.filter(v=>v.id!==plan.vehicle.id).concat(plan.vehicle);modules.accept(plan,financials);if(demo)persistDemo();}});
+const operations=createOperations({state:()=>({profile,user,demo,sdk,db,tab,month:monthKey(),records,employees,sales:modules.allSales(),finances:modules.financials()}),render,fail,toast,setMonth:m=>{calendarDate=dateObj(m+'-01');},saveVehicle:(data,expected,reason)=>saveRecord(data,expected,reason),openSale:id=>modules.openSale(id)});
+const billing=createBilling({state:()=>({profile,user,demo,sdk,db,tab,records,sales:modules.allSales()}),render,fail,toast});
+const fullScreenButton=$('#fullscreen');if(!document.fullscreenEnabled)fullScreenButton.hidden=true;fullScreenButton.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch(e){toast('Le plein écran est indisponible dans ce navigateur.');}};document.addEventListener('fullscreenchange',()=>{fullScreenButton.textContent=document.fullscreenElement?'Quitter le plein écran':'Plein écran';});
+applyPlatformBrand(selectedDealership);
+init();
+
