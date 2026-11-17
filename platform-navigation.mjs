@@ -52,3 +52,14 @@ export function groupWorkspaceDestinations(context,dealerships){
  }
  return sortConcessions([...items.values()]).map(d=>({...d,href:platformDestination(d,{workspacePath:'../'})}));
 }
+
+// Pilot navigation is presentation only: it never changes roles or permissions.
+export const PILOT_PRIMARY_TABS=Object.freeze(['vo','deliveries','calendar','team']);
+export const PILOT_OPTIONAL_TABS=Object.freeze(['home','group','reports','general','serviceBoard','sales','settings','operations','billing']);
+export function pilotSectionIsOptional(tab){return PILOT_OPTIONAL_TABS.includes(tab);}
+export function syncPilotNavigation(root,tab){
+ const note=root.querySelector('#optionalSectionNote');
+ if(note)note.hidden=!pilotSectionIsOptional(tab);
+ const heading=root.querySelector('#optionalNavigationHeading');
+ if(heading)heading.hidden=![...root.querySelectorAll('nav>[data-pilot-optional]')].some(button=>!button.hidden);
+}

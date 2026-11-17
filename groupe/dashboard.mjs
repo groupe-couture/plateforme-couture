@@ -1,19 +1,19 @@
-import {loadDocumentary} from '../documentary-source-ui.mjs?v=1.21.11';
-import {sourceFields,sourceFreshness} from '../history-source-ui.mjs?v=1.21.11';
-import {applyPlatformBrand,brandLogoHtml} from '../branding.mjs?v=1.21.11';
-import {aadPeriodLabel,aadPeriodNote} from './aad-period.mjs?v=1.21.11';
-import {groupEntryLabel} from './group-membership.mjs?v=1.21.11';
-import {CONCESSIONS} from '../registry.mjs?v=1.21.11';
-import {dashboardDealerships,REPORT_LABELS,completionDisplay} from './dashboard-model.1.21.11.mjs?v=1.21.11';
-import {REPORT_DEPARTMENTS,demoDashboardReports,departmentDashboardRows,departmentTotals,filterDashboardRows,formatReportValue,departmentNotes,selectedDepartments,reportStateLabel,dashboardCsv,noExpectedInventoryLabel} from './department-reporting.mjs?v=1.21.11';
-import {generateGroupPdf} from './group-pdf.mjs?v=1.21.11';
-import {reportingWeeks,reportDataForSelection} from './reporting.mjs?v=1.21.11';
-import {historyDefinitions,historyDashboardRows,historyTotals,historyNotes,historyDates,defaultHistorySelection,historyDepartmentSelection,historyServiceAnalyses,historyServiceAnalysis,historyAverageNote,historyTotalNotes,historyPdfSelections} from './history-model.mjs?v=1.21.11';
-import {SERVICE_ANALYSES} from './service-metrics.mjs?v=1.21.11';
-import {reportingNavigation,dashboardSelection,dashboardUrl,groupWorkspaceDestinations} from '../platform-navigation.mjs?v=1.21.11';
-import {checkDashboardRelease} from './release-loader.mjs?v=1.21.11';
-import {createPilotageUI} from '../pilotage-ui.mjs?v=1.21.11';
-import {torontoToday} from '../pilotage.mjs?v=1.21.11';
+import {loadDocumentary} from '../documentary-source-ui.mjs?v=1.21.12';
+import {sourceFields,sourceFreshness} from '../history-source-ui.mjs?v=1.21.12';
+import {applyPlatformBrand,brandLogoHtml} from '../branding.mjs?v=1.21.12';
+import {aadPeriodLabel,aadPeriodNote} from './aad-period.mjs?v=1.21.12';
+import {groupEntryLabel} from './group-membership.mjs?v=1.21.12';
+import {CONCESSIONS} from '../registry.mjs?v=1.21.12';
+import {dashboardDealerships,REPORT_LABELS,completionDisplay} from './dashboard-model.1.21.12.mjs?v=1.21.12';
+import {REPORT_DEPARTMENTS,demoDashboardReports,departmentDashboardRows,departmentTotals,filterDashboardRows,formatReportValue,departmentNotes,selectedDepartments,reportStateLabel,dashboardCsv,noExpectedInventoryLabel} from './department-reporting.mjs?v=1.21.12';
+import {generateGroupPdf} from './group-pdf.mjs?v=1.21.12';
+import {reportingWeeks,reportDataForSelection} from './reporting.mjs?v=1.21.12';
+import {historyDefinitions,historyDashboardRows,historyTotals,historyNotes,historyDates,defaultHistorySelection,historyDepartmentSelection,historyServiceAnalyses,historyServiceAnalysis,historyAverageNote,historyTotalNotes,historyPdfSelections} from './history-model.mjs?v=1.21.12';
+import {SERVICE_ANALYSES} from './service-metrics.mjs?v=1.21.12';
+import {reportingNavigation,dashboardSelection,dashboardUrl,groupWorkspaceDestinations} from '../platform-navigation.mjs?v=1.21.12';
+import {checkDashboardRelease} from './release-loader.mjs?v=1.21.12';
+import {createPilotageUI} from '../pilotage-ui.mjs?v=1.21.12';
+import {torontoToday} from '../pilotage.mjs?v=1.21.12';
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const format=formatReportValue,live=document.documentElement.dataset.mode==='live';
 let dealers=dashboardDealerships(CONCESSIONS).map(d=>({...d,reporting_enabled:true})),liveData={periods:[],submissions:[],history:{batch:null,records:[]}},source='official',sourceChosen=false,allowedDepartments=Object.keys(REPORT_DEPARTMENTS),ownView=false,navigation={items:[],canReadGroup:true,selectedDealership:'',workspaceId:null},dealerSearch='';
@@ -175,7 +175,7 @@ updateWeeks();
 if(live){
  applyPlatformBrand('groupe-couture',{shell:'group'});
  const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);month=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');kind='monthly_final';$('#month').value=month;updateWeeks();
- import('./live-dashboard.1.21.11.mjs?v=1.21.11').then(({connectLiveDashboard})=>connectLiveDashboard({
+ import('./live-dashboard.1.21.12.mjs?v=1.21.12').then(({connectLiveDashboard})=>connectLiveDashboard({
  onReload:()=>document.querySelector('dialog[open]')?Promise.resolve(false):checkDashboardRelease({currentVersion:document.documentElement.dataset.version,href:location.href}),
  onClear(){$('#workspaceMenu').hidden=true;$('#workspaceMenu').open=false;$('#workspaceLinks').innerHTML='';$('#concessionReturn').hidden=true;$('#concessionReturn').removeAttribute('href');pilotage.clear();detailGeneration++;sourceChosen=false;liveData={periods:[],submissions:[],history:{batch:null,records:[]}};navigation={items:[],canReadGroup:false,selectedDealership:'',workspaceId:null};cachedKey=null;cachedRows=null;clearReadyFile();$('#cards').innerHTML='';$('#tableBody').innerHTML='';$('#tableFoot').innerHTML='';$('#dealerLinks').innerHTML='';$('#dealerSelector').innerHTML='';$('#concessionLogo').hidden=true;applyPlatformBrand('groupe-couture',{shell:'group'});document.querySelectorAll('dialog[open]').forEach(d=>d.close());},
  onData(data){

@@ -1,14 +1,14 @@
-import {pairedRatios,ratioCoverageText} from './paired-ratios.mjs?v=1.21.11';
-import {beforeWeeklyReportingActivation} from './weekly-report-status.mjs?v=1.21.11';
-import {linkedSale,linkedVehicle} from './dossier.mjs?v=1.21.11';
-import {salesMetrics,salesReporting,addWholesaleMetrics} from './operations.mjs?v=1.21.11';
-import {HOUSE,salespeople,boardSeller,salesBoardGroups,dealGrid} from './sales-board.mjs?v=1.21.11';
-import {esc,today,dateObj,dayKey,objectiveSummary,objectiveCoverageLabel} from './domain.mjs?v=1.21.11';
-import {canEditObjectives,isMember,canViewTeam,canViewModule} from './permissions.mjs?v=1.21.11';
-import {DEPT_FIELDS,PLAN_FIELDS,financialCoverageText,financialCoverageIncomplete,number,periodsForMonth,reportId,planId,reportErrors,saleErrors,salesSummary,summarizeReports,summarizePlans,monthsForPeriod,legacySalesSummary} from './reporting.mjs?v=1.21.11';
-import {preparationAnalysis} from './preparation-history.mjs?v=1.21.11';
-import {newId} from './invitations.mjs?v=1.21.11';
-import {createDealershipHistory,historyDepartments} from './dealership-history-ui.mjs?v=1.21.11';
+import {pairedRatios,ratioCoverageText} from './paired-ratios.mjs?v=1.21.12';
+import {beforeWeeklyReportingActivation} from './weekly-report-status.mjs?v=1.21.12';
+import {linkedSale,linkedVehicle} from './dossier.mjs?v=1.21.12';
+import {salesMetrics,salesReporting,addWholesaleMetrics} from './operations.mjs?v=1.21.12';
+import {HOUSE,salespeople,boardSeller,salesBoardGroups,dealGrid} from './sales-board.mjs?v=1.21.12';
+import {esc,today,dateObj,dayKey,objectiveSummary,objectiveCoverageLabel} from './domain.mjs?v=1.21.12';
+import {canEditObjectives,isMember,canViewTeam,canViewModule} from './permissions.mjs?v=1.21.12';
+import {DEPT_FIELDS,PLAN_FIELDS,financialCoverageText,financialCoverageIncomplete,number,periodsForMonth,reportId,planId,reportErrors,saleErrors,salesSummary,summarizeReports,summarizePlans,monthsForPeriod,legacySalesSummary} from './reporting.mjs?v=1.21.12';
+import {preparationAnalysis} from './preparation-history.mjs?v=1.21.12';
+import {newId} from './invitations.mjs?v=1.21.12';
+import {createDealershipHistory,historyDepartments} from './dealership-history-ui.mjs?v=1.21.12';
 const names={vente:'Ventes',service:'Service',piece:'Pièces',esthetique:'Esthétique'};
 const payments={comptant:['Comptant','cash'],financement:['Financement','finance'],location:['Location','lease']};
 const sum=a=>{const v=a.filter(Number.isFinite);return v.length?v.reduce((n,x)=>n+x,0):null;};
@@ -70,8 +70,8 @@ export function createModules(ctx){
   document.querySelectorAll('[data-sale-type]').forEach(b=>b.onclick=()=>{dirty=false;const k=b.dataset.saleType;if(['VN','VO'].includes(k)){kind=k;salesView='board';}else salesView=k;ctx.navigate('sales');});
   const select=$('#mobileNavigation');const options=[];for(const b of document.querySelectorAll('nav>[data-tab]')){if(b.hidden)continue;const k=b.dataset.tab;
    if(k==='vo')options.push(['vo:list','Préparation · Véhicules'],...(C().profile.role!=='employe'?[['vo:analysis','Préparation · Analyse']]:[]));
-   else if(k==='sales')options.push(['sales:VN','Tableau ventes · Neuf'],['sales:VO','Tableau ventes · Occasion'],...(can('vente')?[['sales:products','Tableau ventes · Produits F&I'],['sales:profits','Tableau ventes · Profits et bonis']]:[]));
-   else if(k==='settings')for(const d of departments())options.push(['settings:'+d,'KPI · '+names[d]]);
+   else if(k==='sales')options.push(['sales:VN','Tableau ventes · Neuf · Facultatif'],['sales:VO','Tableau ventes · Occasion · Facultatif'],...(can('vente')?[['sales:products','Tableau ventes · Produits F&I · Facultatif'],['sales:profits','Tableau ventes · Profits et bonis · Facultatif']]:[]));
+   else if(k==='settings')for(const d of departments())options.push(['settings:'+d,'KPI · '+names[d]+' · Facultatif']);
    else if(k==='team')for(const [d,l]of [['users','Utilisateurs'],['messages','Messages'],['organigramme','Organigramme']].filter(([v])=>canViewTeam(C().profile,v)))options.push(['team:'+d,'Équipe · '+l]);
    else options.push([k,b.textContent.trim()]);
   }
@@ -202,7 +202,7 @@ export function createModules(ctx){
   const periods=periodsForMonth(getMonth()),completed=periods.filter(p=>p.periodEnd<=today());if(!periods.some(p=>p.periodEnd===selectedPeriod))selectedPeriod=(completed.at(-1)||periods[0])?.periodEnd;
   const period=periods.find(p=>p.periodEnd===selectedPeriod),old=reports.find(r=>r.id===reportId(d,k,period)),values=old?.values||{};
   const beforeActivation=beforeWeeklyReportingActivation(C().profile,period,old),isDue=!beforeActivation&&period.dueOn<=today(),future=period.periodEnd>today();
-  header('KPI · '+names[d],'Objectifs mensuels et saisie du vendredi',monthControls());
+  header('KPI · '+names[d]+' · Facultatif','Objectifs mensuels et saisie du vendredi',monthControls());
   let totals='';if(d==='vente'){const s=objectiveSummary(C().records,C().goals,getMonth());totals='<div class="ls-summary delivered-pairs">'+['VN','VO'].map(t=>card((t==='VN'?'Neufs':'Occasions')+' · livrés du mois',s.month[t]+' / '+fmt(C().goals[getMonth()]?.[t]),getMonth())+card((t==='VN'?'Neufs':'Occasions')+' · livrés AAD',s.ytd[t]+' / '+(s.missing[t]<s.elapsed?s.target[t]:'—'),objectiveCoverageLabel(s,t))).join('')+'</div>';}
   $('#content').innerHTML=(d==='vente'?'<p class="notice local-kpi-source">Livraisons enregistrées dans la plateforme uniquement, hors historique Téléprésence.'+(!C().demo?' L’historique Téléprésence, lorsqu’il est accessible, reste distinct des dossiers locaux et n’y est pas additionné.':'')+'</p>':'')+totals+(d==='vente'?`<div class="ls-row"><button id="weeklyVN" class="ls-btn ${k==='VN'?'primary':''}">Neuf</button><button id="weeklyVO" class="ls-btn ${k==='VO'?'primary':''}">Occasion</button></div>`:'')+
    `<section class="ls-panel"><h2>Objectif mensuel${d==='vente'?' · ventes signées':''}</h2><form id="monthlyPlanForm"><div class="ls-fields">${fields(PLAN_FIELDS[d],existing?.values||defaults)}</div><div class="ls-form-actions"><span class="ls-secondary">${getMonth()} · ${d==='vente'?(k==='VN'?'Neuf':'Occasion'):names[d]}</span><button class="ls-btn primary">Enregistrer l’objectif</button></div><p id="planError" role="alert" class="error"></p></form></section>`+

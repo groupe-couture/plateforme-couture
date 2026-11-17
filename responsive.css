@@ -12,3 +12,12 @@
 @media(max-width:600px){aside .brand{font-size:1.1rem;white-space:nowrap}.aside-bottom #connection{display:none}aside>.aside-bottom{gap:.25rem;min-width:0}.aside-bottom #logout{font-size:.8rem}#app .ls-deal strong{font-size:.9rem}#app .ls-model{font-size:.85rem}}
 
 .workspace-picker{display:grid;gap:7px;margin:18px 0 0;color:#c2d6e4;font-size:12px}.workspace-picker select{width:100%;padding:9px;font-size:11px}aside>.brand{overflow-wrap:anywhere}@media(max-width:700px){.workspace-picker{margin-top:12px;max-width:360px}.workspace-picker select{font-size:13px}}
+
+/* Pilot: prioritize daily vehicle operations without changing access rights. */
+.nav-section-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#c8dae8;margin:.75rem .65rem .4rem}
+.nav-optional-heading{border-top:1px solid #ffffff30;margin-top:1rem;padding-top:.4rem}
+.nav-optional-heading>p:not(.nav-section-label){font-size:.75rem;line-height:1.4;color:#bfd0df;margin:.3rem .65rem .7rem}
+nav>[data-pilot-optional]{display:grid;gap:.2rem}
+nav>[data-pilot-optional]>small{font-size:.72rem;color:#bfd0df}
+header .optional-section-note{margin-top:.75rem;padding:.55rem .75rem;border-left:3px solid #74899a;background:#eef3f7;color:#415567;font-size:.9rem}
+.preparation-tabs{display:flex;gap:8px;flex-wrap:wrap}.preparation-tabs button[aria-pressed="true"]{background:#183d55;color:white}.record-actions{min-width:155px}.record-actions button{margin:3px}.record-actions small{display:block}.record-actions button:disabled{opacity:.55;cursor:not-allowed}

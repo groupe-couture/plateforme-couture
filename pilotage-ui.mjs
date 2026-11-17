@@ -1,4 +1,4 @@
-import {PILOTAGE_DEPARTMENTS,TASK_STATUSES,pilotageRows,aggregatePilotage,managementPermissions,managementTaskId,taskErrors,taskSummary,torontoToday} from './pilotage.mjs?v=1.21.11';
+import {PILOTAGE_DEPARTMENTS,TASK_STATUSES,pilotageRows,aggregatePilotage,managementPermissions,managementTaskId,taskErrors,taskSummary,torontoToday} from './pilotage.mjs?v=1.21.12';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(v,money=false)=>typeof v==='number'&&Number.isFinite(v)?new Intl.NumberFormat('fr-CA',{maximumFractionDigits:money?2:0,minimumFractionDigits:0}).format(v)+(money?' $':''):'—';
 const percent=v=>v===null?'—':new Intl.NumberFormat('fr-CA',{maximumFractionDigits:1}).format(v)+' %';

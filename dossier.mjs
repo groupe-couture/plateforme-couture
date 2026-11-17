@@ -1,7 +1,8 @@
-import {defaultSteps,complete,today} from './domain.mjs?v=1.21.11';
-import {saleErrors} from './reporting.mjs?v=1.21.11';
-import {stampPreparation} from './preparation-history.mjs?v=1.21.11';
-import {newId} from './invitations.mjs?v=1.21.11';
+import {reconcilePreparationArchive} from './preparation-archive.mjs?v=1.21.12';
+import {defaultSteps,complete,today} from './domain.mjs?v=1.21.12';
+import {saleErrors} from './reporting.mjs?v=1.21.12';
+import {stampPreparation} from './preparation-history.mjs?v=1.21.12';
+import {newId} from './invitations.mjs?v=1.21.12';
 
 export const stockKey=v=>String(v||'').trim().toUpperCase();
 export function linkedVehicle(s,vehicles){
@@ -40,7 +41,8 @@ export function dossierPlan({vehicle:inputVehicle,sale:inputSale,oldVehicle,oldS
    }else if(sale.status==='Livré')throw Error('Confirmez la livraison dans le dossier de préparation avec sa date réelle.');
   }else if(sale.status==='Livré')throw Error('La livraison doit être confirmée dans le dossier véhicule.');
  }
- const history=[...(oldVehicle?.history||[]),{at:now,by:author,message:inputSale?'Vente et dossier véhicule liés / mis à jour':'Dossier commun mis à jour'}].slice(-100);
+ vehicle=reconcilePreparationArchive(vehicle);
+ const history=[...(oldVehicle?.history||[]),{at:now,by:author,message:!oldVehicle?.preparationArchivedAt&&vehicle.preparationArchivedAt?'Préparation prête et archivée':oldVehicle?.preparationArchivedAt&&!vehicle.preparationArchivedAt?'Préparation remise dans la file active':inputSale?'Vente et dossier véhicule liés / mis à jour':'Dossier commun mis à jour'}].slice(-100);
  vehicle={...vehicle,...stampPreparation(oldVehicle,vehicle),createdAt:oldVehicle?.createdAt||now,updatedAt:now,version:(oldVehicle?.version||0)+1,history};
  if(sale)sale={...sale,createdAt:oldSale?.createdAt||now,updatedAt:now,version:(oldSale?.version||0)+1};
  return {vehicle,sale};

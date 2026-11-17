@@ -1,5 +1,5 @@
-import {today} from './domain.mjs?v=1.21.11';
-import {validDate} from './operations.mjs?v=1.21.11';
+import {today} from './domain.mjs?v=1.21.12';
+import {validDate} from './operations.mjs?v=1.21.12';
 
 export const BILLING_CATEGORIES=['Produit','Pièce','Accessoire','Service','Autre'];
 export const TAX_MODES={qc:'TPS + TVQ',zero:'Détaxé (0 %)',exempt:'Exonéré'};
