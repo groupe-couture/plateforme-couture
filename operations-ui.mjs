@@ -1,8 +1,8 @@
-import {createPurchaseTools} from './purchases-ui.mjs?v=1.21.13';
-import {esc,today,complete} from './domain.mjs?v=1.21.13';
-import {canEditObjectives,isMember} from './permissions.mjs?v=1.21.13';
-import {newId} from './invitations.mjs?v=1.21.13';
-import {INSPECTION_POINTS,INSPECTION_STATES,inspectionErrors,workErrors,money,productLines,bonusTotal,salesMetrics,addWholesaleMetrics,wholesaleErrors,wholesaleProfit,antiqueErrors} from './operations.mjs?v=1.21.13';
+import {createPurchaseTools} from './purchases-ui.mjs?v=1.21.14';
+import {esc,today,complete} from './domain.mjs?v=1.21.14';
+import {canEditObjectives,isMember} from './permissions.mjs?v=1.21.14';
+import {newId} from './invitations.mjs?v=1.21.14';
+import {INSPECTION_POINTS,INSPECTION_STATES,inspectionErrors,workErrors,money,productLines,bonusTotal,salesMetrics,addWholesaleMetrics,wholesaleErrors,wholesaleProfit,antiqueErrors} from './operations.mjs?v=1.21.14';
 
 const currency=v=>v===null||v===undefined?'—':new Intl.NumberFormat('fr-CA',{style:'currency',currency:'CAD'}).format(v);
 const opt=(list,value)=>list.map(s=>`<option ${s===value?'selected':''}>${esc(s)}</option>`).join('');

@@ -1,13 +1,13 @@
-import {loadDocumentary} from './documentary-source-ui.mjs?v=1.21.13';
-import {sourceFields,sourceFreshness} from './history-source-ui.mjs?v=1.21.13';
-import {createCentralReporting} from './central-reporting-core.mjs?v=1.21.13';
-import {canEditObjectives,isMember} from './permissions.mjs?v=1.21.13';
-import {esc} from './domain.mjs?v=1.21.13';
-import {historyDashboardRows,historyDates,defaultHistorySelection,HISTORY_DEPARTMENTS,historyDepartmentSelection,historyServiceAnalyses,historyServiceAnalysis,historyAverageNote,historyPdfSelections} from './groupe/history-model.mjs?v=1.21.13';
-import {SERVICE_ANALYSES,SERVICE_EXTRA_COLUMNS,SERVICE_NOTES} from './groupe/service-metrics.mjs?v=1.21.13';
-import {formatReportValue,reportStateLabel} from './groupe/department-reporting.mjs?v=1.21.13';
-import {aadPeriodLabel,aadPeriodNote} from './groupe/aad-period.mjs?v=1.21.13';
-import {generateGroupPdf} from './groupe/group-pdf.mjs?v=1.21.13';
+import {loadDocumentary} from './documentary-source-ui.mjs?v=1.21.14';
+import {sourceFields,sourceFreshness} from './history-source-ui.mjs?v=1.21.14';
+import {createCentralReporting} from './central-reporting-core.mjs?v=1.21.14';
+import {canEditObjectives,isMember} from './permissions.mjs?v=1.21.14';
+import {esc} from './domain.mjs?v=1.21.14';
+import {historyDashboardRows,historyDates,defaultHistorySelection,HISTORY_DEPARTMENTS,historyDepartmentSelection,historyServiceAnalyses,historyServiceAnalysis,historyAverageNote,historyPdfSelections} from './groupe/history-model.mjs?v=1.21.14';
+import {SERVICE_ANALYSES,SERVICE_EXTRA_COLUMNS,SERVICE_NOTES} from './groupe/service-metrics.mjs?v=1.21.14';
+import {formatReportValue,reportStateLabel} from './groupe/department-reporting.mjs?v=1.21.14';
+import {aadPeriodLabel,aadPeriodNote} from './groupe/aad-period.mjs?v=1.21.14';
+import {generateGroupPdf} from './groupe/group-pdf.mjs?v=1.21.14';
 
 export function historyDepartments(profile){
  if(!isMember(profile)||profile.role==='employe'||profile.reportingEnabled===false)return [];

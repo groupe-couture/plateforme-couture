@@ -1,4 +1,4 @@
-import {complete} from './domain.mjs?v=1.21.13';
+import {complete} from './domain.mjs?v=1.21.14';
 export function preparationArchiveError(v){
  if(!v||v.type!=='VO')return 'Sélectionnez un véhicule d’occasion.';
  if(v.archived)return 'Ce dossier est déjà archivé.';
