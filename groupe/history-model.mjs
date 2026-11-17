@@ -1,8 +1,8 @@
-import {sortGroupRows} from './dashboard-model.mjs?v=1.21.12';
-import {REPORT_DEPARTMENTS,previousMonth,inventoryCoverage} from './department-reporting.mjs?v=1.21.12';
-import {groupStartMonth,outsideGroup,completionCounts} from './group-membership.mjs?v=1.21.12';
-import {historyAadPeriod} from './aad-period.mjs?v=1.21.12';
-import {SERVICE_ANALYSES,SERVICE_FLOW_KEYS,SERVICE_SNAPSHOT_KEYS,serviceDerived,SERVICE_NOTES} from './service-metrics.mjs?v=1.21.12';
+import {sortGroupRows} from './dashboard-model.mjs?v=1.21.13';
+import {REPORT_DEPARTMENTS,previousMonth,inventoryCoverage} from './department-reporting.mjs?v=1.21.13';
+import {groupStartMonth,outsideGroup,completionCounts} from './group-membership.mjs?v=1.21.13';
+import {historyAadPeriod} from './aad-period.mjs?v=1.21.13';
+import {SERVICE_ANALYSES,SERVICE_FLOW_KEYS,SERVICE_SNAPSHOT_KEYS,serviceDerived,SERVICE_NOTES} from './service-metrics.mjs?v=1.21.13';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const sum=vs=>vs.length&&vs.every(finite)?vs.reduce((a,b)=>a+b,0):null;
 const sumKnown=vs=>{const known=vs.filter(finite);return known.length?known.reduce((a,b)=>a+b,0):null;};

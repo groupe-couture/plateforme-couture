@@ -1,37 +1,37 @@
-import {archivePreparation,restorePreparation,archivedPreparations,preparationArchiveError} from './preparation-archive.mjs?v=1.21.12';
-import {preserveSelectValue,enableManualDeliveryAssignments,mountDepartmentDirectory} from './preserve-select-value.mjs?v=1.21.12';
-import {mountRosterReadiness} from './access-readiness.mjs?v=1.21.12';
-import {createSubscriptionErrors} from './subscription-errors.mjs?v=1.21.12';
-import {checkWorkspaceRelease} from './workspace-release.mjs?v=1.21.12';
-import {createPilotageUI} from './pilotage-ui.mjs?v=1.21.12';
-import {createManagementApi} from './management-api.mjs?v=1.21.12';
-import {createPasswordFlow,cleanPasswordUrl,RECOVERY_EXPIRED} from './password-flow.mjs?v=1.21.12';
-import {applyPlatformBrand} from './branding.mjs?v=1.21.12';
-import {createCentralReportingUI} from './central-reporting-ui.mjs?v=1.21.12';
-import {readAccessContext} from './access-context.mjs?v=1.21.12';
-import {createCentralReporting} from './central-reporting-core.mjs?v=1.21.12';
-import {workspaceNavigation,platformDestination,syncPilotNavigation} from './platform-navigation.mjs?v=1.21.12';
-import {canViewModule,canViewGroup,initialWorkspaceView} from './permissions.mjs?v=1.21.12';
-import {createBilling} from './billing-ui.mjs?v=1.21.12';
-import {createDossierService} from './dossier.mjs?v=1.21.12';
-import {createOperations} from './operations-ui.mjs?v=1.21.12';
-import {saleErrors} from './reporting.mjs?v=1.21.12';
-import {createModules} from './modules-ui.mjs?v=1.21.12';
-import {stampPreparation,preparationDateErrors} from './preparation-history.mjs?v=1.21.12';
-import {ROLES,parseRoster,draftErrors,newId,validEmail,employeeDepartmentGroups} from './invitations.mjs?v=1.21.12';
-import {urgentDelivery,reminderDelivery,deliveryReady} from './delivery.mjs?v=1.21.12';
-import {recordErrors} from './record-validation.mjs?v=1.21.12';
-import {preparationSummary} from './preparation-view.mjs?v=1.21.12';
-import {TEAM_VIEWS,ACCESS_FIELDS,SUBMENUS,canViewSubcategory,availableSubcategories,canViewTeam,availableTeamViews,canEditObjectives,canManageAccess} from './permissions.mjs?v=1.21.12';
-import {SECTIONS,departmentSummary} from './objectives.mjs?v=1.21.12';
-import {DEPARTMENTS} from './departments.mjs?v=1.21.12';
-import {STEPS,objectiveSummary,stepsFor,STATES,today,dayKey,dateObj,age,complete,progress,counts,preparationQueue,defaultSteps,validate,esc} from './domain.mjs?v=1.21.12';
-import {supabaseConfig} from './supabase-config.js?v=1.21.12';
-import {createSupabaseBridge} from './supabase-bridge.mjs?v=1.21.12';
+import {archivePreparation,restorePreparation,archivedPreparations,preparationArchiveError} from './preparation-archive.mjs?v=1.21.13';
+import {preserveSelectValue,enableManualDeliveryAssignments,mountDepartmentDirectory} from './preserve-select-value.mjs?v=1.21.13';
+import {mountRosterReadiness} from './access-readiness.mjs?v=1.21.13';
+import {createSubscriptionErrors} from './subscription-errors.mjs?v=1.21.13';
+import {checkWorkspaceRelease} from './workspace-release.mjs?v=1.21.13';
+import {createPilotageUI} from './pilotage-ui.mjs?v=1.21.13';
+import {createManagementApi} from './management-api.mjs?v=1.21.13';
+import {createPasswordFlow,cleanPasswordUrl,RECOVERY_EXPIRED} from './password-flow.mjs?v=1.21.13';
+import {applyPlatformBrand} from './branding.mjs?v=1.21.13';
+import {createCentralReportingUI} from './central-reporting-ui.mjs?v=1.21.13';
+import {readAccessContext} from './access-context.mjs?v=1.21.13';
+import {createCentralReporting} from './central-reporting-core.mjs?v=1.21.13';
+import {workspaceNavigation,platformDestination,syncPilotNavigation} from './platform-navigation.mjs?v=1.21.13';
+import {canViewModule,canViewGroup,initialWorkspaceView} from './permissions.mjs?v=1.21.13';
+import {createBilling} from './billing-ui.mjs?v=1.21.13';
+import {createDossierService} from './dossier.mjs?v=1.21.13';
+import {createOperations} from './operations-ui.mjs?v=1.21.13';
+import {saleErrors} from './reporting.mjs?v=1.21.13';
+import {createModules} from './modules-ui.mjs?v=1.21.13';
+import {stampPreparation,preparationDateErrors} from './preparation-history.mjs?v=1.21.13';
+import {ROLES,parseRoster,draftErrors,newId,validEmail,employeeDepartmentGroups} from './invitations.mjs?v=1.21.13';
+import {urgentDelivery,reminderDelivery,deliveryReady} from './delivery.mjs?v=1.21.13';
+import {recordErrors} from './record-validation.mjs?v=1.21.13';
+import {preparationSummary} from './preparation-view.mjs?v=1.21.13';
+import {TEAM_VIEWS,ACCESS_FIELDS,SUBMENUS,canViewSubcategory,availableSubcategories,canViewTeam,availableTeamViews,canEditObjectives,canManageAccess} from './permissions.mjs?v=1.21.13';
+import {SECTIONS,departmentSummary} from './objectives.mjs?v=1.21.13';
+import {DEPARTMENTS} from './departments.mjs?v=1.21.13';
+import {STEPS,objectiveSummary,stepsFor,STATES,today,dayKey,dateObj,age,complete,progress,counts,preparationQueue,defaultSteps,validate,esc} from './domain.mjs?v=1.21.13';
+import {supabaseConfig} from './supabase-config.js?v=1.21.13';
+import {createSupabaseBridge} from './supabase-bridge.mjs?v=1.21.13';
 const $=s=>document.querySelector(s),demo=new URLSearchParams(location.search).get('demo')==='1';
 const selectedDealership=new URLSearchParams(location.search).get('concession')||'levis-subaru';
 let accessReadinessOpen=false;
-const APP_VERSION='1.21.12';let lastWorkspaceReleaseCheck=0;
+const APP_VERSION='1.21.13';let lastWorkspaceReleaseCheck=0;
 async function checkPublishedWorkspace(){if(Date.now()-lastWorkspaceReleaseCheck<15000)return false;lastWorkspaceReleaseCheck=Date.now();return checkWorkspaceRelease({currentVersion:APP_VERSION,href:location.href});}
 let metricUnsubs=[],metricYear='',departmentData={},objectiveView='vente';
 let employees=[],messages=[],teamView='users',editingEmployee=null,inviteDraft=null,inviting=false,editingMessage=null;
@@ -170,7 +170,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$('#recordDia
 function exportCSV(){const rows=visible(),fields=['Stock','Catégorie','Véhicule','Arrivée','Emplacement','Clés','Blocage','Livraison prévue','Heure','Statut livraison','Livraison réelle','Couleur','Directrice financière','Pièces livraison','État pièces',...STEPS.map(([,l])=>l)];const data=[fields,...rows.map(v=>[v.stock,v.type,v.model,v.arrival,v.location,v.keys,v.blocker,v.delivery?.date,v.delivery?.time,v.delivery?.status,v.delivery?.actualDate,v.color,v.delivery?.finance,v.delivery?.parts,v.delivery?(v.steps?.pieces?.status||'À faire'):'Non applicable',...STEPS.map(([k])=>k==='photos'&&v.delivery?'Non applicable':(v.steps?.[k]?.status||'À faire'))])];const q=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+data.map(r=>r.map(q).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`levis-subaru-${tab}-${today()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 function persistDemo(){localStorage.setItem('levis-demo-synthetic-v2',JSON.stringify({records,goals,team,employees,messages,departmentData}));}
 function seed(){const base={vin:'',keys:'Armoire service · 12',notes:'Dossier fictif pour les essais.',blocker:'',archived:false,version:1,createdAt:new Date().toISOString(),history:[]};return [['U101','2023 Subaru Outback','VO',10,'Mécanique'],['U102','2022 Subaru Crosstrek','VO',6,'Lavage'],['N201','2026 Subaru Forester','VN',2,'Concession']].map(([stock,model,type,days,location],i)=>{const d=dateObj(today());d.setDate(d.getDate()-days);const steps=defaultSteps(type);if(i===1){steps.inspection.status='Terminé';steps.mechanique.status='Terminé';steps.sousTraitance.status='Non requis';steps.lavage.status='En cours';}return {...base,id:'demo-'+i,stock,model,type,arrival:dayKey(d),location,steps,delivery:i===2?{client:'Client démonstration',advisor:'Conseiller démonstration',date:today(),time:'14:00',status:'Demandée',actualDate:'',driver:'Livreur fictif',promises:'Installer les tapis.'}:null};});}
-async function init(){if(demo){const {EMPLOYEES}=await import('./employees.mjs?v=1.21.12');let cached;try{cached=JSON.parse(localStorage.getItem('levis-demo-synthetic-v2'));}catch{}records=cached?.records||seed();goals=cached?.goals||{};user={uid:'demo',email:'demo'};const testRole=new URLSearchParams(location.search).get('profil'),testDept=new URLSearchParams(location.search).get('departement')||'service';profile={name:'Démonstration',role:['dg','directeur','employe'].includes(testRole)?testRole:'admin',department:testDept,active:true,poste:'Profil fictif',sections:testDept==='vente'?['vente:VN','vente:VO']:[testDept+':all'],dealershipId:selectedDealership,dealershipName:'Concession de démonstration'};team=cached?.team||[{uid:'demo',...profile,email:'demo@example.invalid'}];departmentData=cached?.departmentData||{};employees=cached?.employees||structuredClone(EMPLOYEES);messages=cached?.messages||[];ready=true;$('#login').hidden=true;$('#app').hidden=false;$('#demoNote').hidden=false;$('#identity').textContent='Démonstration';$('#connection').textContent='Données locales';render();$('#logout').onclick=()=>location.href=location.pathname;return;}
+async function init(){if(demo){const {EMPLOYEES}=await import('./employees.mjs?v=1.21.13');let cached;try{cached=JSON.parse(localStorage.getItem('levis-demo-synthetic-v2'));}catch{}records=cached?.records||seed();goals=cached?.goals||{};user={uid:'demo',email:'demo'};const testRole=new URLSearchParams(location.search).get('profil'),testDept=new URLSearchParams(location.search).get('departement')||'service';profile={name:'Démonstration',role:['dg','directeur','employe'].includes(testRole)?testRole:'admin',department:testDept,active:true,poste:'Profil fictif',sections:testDept==='vente'?['vente:VN','vente:VO']:[testDept+':all'],dealershipId:selectedDealership,dealershipName:'Concession de démonstration'};team=cached?.team||[{uid:'demo',...profile,email:'demo@example.invalid'}];departmentData=cached?.departmentData||{};employees=cached?.employees||structuredClone(EMPLOYEES);messages=cached?.messages||[];ready=true;$('#login').hidden=true;$('#app').hidden=false;$('#demoNote').hidden=false;$('#identity').textContent='Démonstration';$('#connection').textContent='Données locales';render();$('#logout').onclick=()=>location.href=location.pathname;return;}
 try{
   if(!/^https:\/\/.+\.supabase\.co$/.test(supabaseConfig.url)||!supabaseConfig.publishableKey||supabaseConfig.publishableKey.startsWith('REMPLACER_'))
     throw Error('Configuration Supabase manquante : renseigner la clé publique dans supabase-config.js.');

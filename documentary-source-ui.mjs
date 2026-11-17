@@ -1,5 +1,5 @@
 // Consultation documentaire uniquement : aucune projection vers les résultats.
-import {readableSourceValue,sourceValue,sourceFormat} from './history-source-ui.mjs?v=1.21.12';
+import {readableSourceValue,sourceValue,sourceFormat} from './history-source-ui.mjs?v=1.21.13';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sections=new Set(['vente:VN','vente:VO','service:all','piece:all']);
 export function documentaryRecords(result,{monthlyImportId,group=false,dealershipId,allowedSections=[]}={}){

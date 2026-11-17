@@ -1,8 +1,8 @@
-import {reconcilePreparationArchive} from './preparation-archive.mjs?v=1.21.12';
-import {defaultSteps,complete,today} from './domain.mjs?v=1.21.12';
-import {saleErrors} from './reporting.mjs?v=1.21.12';
-import {stampPreparation} from './preparation-history.mjs?v=1.21.12';
-import {newId} from './invitations.mjs?v=1.21.12';
+import {reconcilePreparationArchive} from './preparation-archive.mjs?v=1.21.13';
+import {defaultSteps,complete,today} from './domain.mjs?v=1.21.13';
+import {saleErrors} from './reporting.mjs?v=1.21.13';
+import {stampPreparation} from './preparation-history.mjs?v=1.21.13';
+import {newId} from './invitations.mjs?v=1.21.13';
 
 export const stockKey=v=>String(v||'').trim().toUpperCase();
 export function linkedVehicle(s,vehicles){

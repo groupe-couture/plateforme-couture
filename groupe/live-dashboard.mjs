@@ -1,8 +1,8 @@
-import {passwordReturnTarget} from '../password-flow.mjs?v=1.21.12';
-import {supabaseConfig} from '../supabase-config.js?v=1.21.12';
-import {readAccessContext} from '../access-context.mjs?v=1.21.12';
-import {createCentralReporting} from './reporting.mjs?v=1.21.12';
-import {createManagementApi} from '../management-api.mjs?v=1.21.12';
+import {passwordReturnTarget} from '../password-flow.mjs?v=1.21.13';
+import {supabaseConfig} from '../supabase-config.js?v=1.21.13';
+import {readAccessContext} from '../access-context.mjs?v=1.21.13';
+import {createCentralReporting} from './reporting.mjs?v=1.21.13';
+import {createManagementApi} from '../management-api.mjs?v=1.21.13';
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const knownReportSections=new Set(['vente:VN','vente:VO','service:all','piece:all','esthetique:all']);
 const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);

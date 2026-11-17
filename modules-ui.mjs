@@ -1,14 +1,14 @@
-import {pairedRatios,ratioCoverageText} from './paired-ratios.mjs?v=1.21.12';
-import {beforeWeeklyReportingActivation} from './weekly-report-status.mjs?v=1.21.12';
-import {linkedSale,linkedVehicle} from './dossier.mjs?v=1.21.12';
-import {salesMetrics,salesReporting,addWholesaleMetrics} from './operations.mjs?v=1.21.12';
-import {HOUSE,salespeople,boardSeller,salesBoardGroups,dealGrid} from './sales-board.mjs?v=1.21.12';
-import {esc,today,dateObj,dayKey,objectiveSummary,objectiveCoverageLabel} from './domain.mjs?v=1.21.12';
-import {canEditObjectives,isMember,canViewTeam,canViewModule} from './permissions.mjs?v=1.21.12';
-import {DEPT_FIELDS,PLAN_FIELDS,financialCoverageText,financialCoverageIncomplete,number,periodsForMonth,reportId,planId,reportErrors,saleErrors,salesSummary,summarizeReports,summarizePlans,monthsForPeriod,legacySalesSummary} from './reporting.mjs?v=1.21.12';
-import {preparationAnalysis} from './preparation-history.mjs?v=1.21.12';
-import {newId} from './invitations.mjs?v=1.21.12';
-import {createDealershipHistory,historyDepartments} from './dealership-history-ui.mjs?v=1.21.12';
+import {pairedRatios,ratioCoverageText} from './paired-ratios.mjs?v=1.21.13';
+import {beforeWeeklyReportingActivation} from './weekly-report-status.mjs?v=1.21.13';
+import {linkedSale,linkedVehicle} from './dossier.mjs?v=1.21.13';
+import {salesMetrics,salesReporting,addWholesaleMetrics} from './operations.mjs?v=1.21.13';
+import {HOUSE,salespeople,boardSeller,salesBoardGroups,dealGrid} from './sales-board.mjs?v=1.21.13';
+import {esc,today,dateObj,dayKey,objectiveSummary,objectiveCoverageLabel} from './domain.mjs?v=1.21.13';
+import {canEditObjectives,isMember,canViewTeam,canViewModule} from './permissions.mjs?v=1.21.13';
+import {DEPT_FIELDS,PLAN_FIELDS,financialCoverageText,financialCoverageIncomplete,number,periodsForMonth,reportId,planId,reportErrors,saleErrors,salesSummary,summarizeReports,summarizePlans,monthsForPeriod,legacySalesSummary} from './reporting.mjs?v=1.21.13';
+import {preparationAnalysis} from './preparation-history.mjs?v=1.21.13';
+import {newId} from './invitations.mjs?v=1.21.13';
+import {createDealershipHistory,historyDepartments} from './dealership-history-ui.mjs?v=1.21.13';
 const names={vente:'Ventes',service:'Service',piece:'Pièces',esthetique:'Esthétique'};
 const payments={comptant:['Comptant','cash'],financement:['Financement','finance'],location:['Location','lease']};
 const sum=a=>{const v=a.filter(Number.isFinite);return v.length?v.reduce((n,x)=>n+x,0):null;};
@@ -53,6 +53,8 @@ export function createModules(ctx){
         && [y,String(Number(y)-1)].some(year=>item.id.startsWith(item.id.split('_')[0]+'_'+year+'-')))
       .map(({id,...data})=>[id,data]));
   });
+  // Operational-only members have no financial/report subscriptions to await.
+  loaded=pending===0;
  }
  async function put(collection,id,data){
   const c=C(),payload={...data,updatedAt:new Date().toISOString(),updatedBy:c.user.uid};
@@ -64,12 +66,12 @@ export function createModules(ctx){
  function header(title,sub,controls=''){$('#pageTitle').textContent=title;$('#subtitle').textContent=sub;$('#add').hidden=true;$('#metrics').innerHTML='';$('#toolbar').innerHTML=controls;bindMonth();}
  function nav(){
   $('#voSubnav').hidden=C().tab!=='vo';$('#salesSubnav').hidden=C().tab!=='sales';
-  $('#voSubnav').innerHTML=[['list','Véhicules'],...(C().profile.role!=='employe'?[['analysis','Analyse']]:[])].map(([k,l])=>`<button class="${modeVO===k?'selected':''}" data-prep-view="${k}">${l}</button>`).join('');
+  $('#voSubnav').innerHTML=[['list','Véhicules'],...(canViewModule(C().profile,'vo')?[['analysis','Analyse']]:[])].map(([k,l])=>`<button class="${modeVO===k?'selected':''}" data-prep-view="${k}">${l}</button>`).join('');
   $('#salesSubnav').innerHTML=[['VN','Neuf'],['VO','Occasion'],...(can('vente')?[['products','Produits F&I'],['profits','Profits et bonis']]:[])].map(([k,l])=>`<button class="${salesView==='board'?kind===k?'selected':'':salesView===k?'selected':''}" data-sale-type="${k}">${l}</button>`).join('');
   document.querySelectorAll('[data-prep-view]').forEach(b=>b.onclick=()=>{dirty=false;modeVO=b.dataset.prepView;ctx.navigate('vo');});
   document.querySelectorAll('[data-sale-type]').forEach(b=>b.onclick=()=>{dirty=false;const k=b.dataset.saleType;if(['VN','VO'].includes(k)){kind=k;salesView='board';}else salesView=k;ctx.navigate('sales');});
   const select=$('#mobileNavigation');const options=[];for(const b of document.querySelectorAll('nav>[data-tab]')){if(b.hidden)continue;const k=b.dataset.tab;
-   if(k==='vo')options.push(['vo:list','Préparation · Véhicules'],...(C().profile.role!=='employe'?[['vo:analysis','Préparation · Analyse']]:[]));
+   if(k==='vo')options.push(['vo:list','Préparation · Véhicules'],...(canViewModule(C().profile,'vo')?[['vo:analysis','Préparation · Analyse']]:[]));
    else if(k==='sales')options.push(['sales:VN','Tableau ventes · Neuf · Facultatif'],['sales:VO','Tableau ventes · Occasion · Facultatif'],...(can('vente')?[['sales:products','Tableau ventes · Produits F&I · Facultatif'],['sales:profits','Tableau ventes · Profits et bonis · Facultatif']]:[]));
    else if(k==='settings')for(const d of departments())options.push(['settings:'+d,'KPI · '+names[d]+' · Facultatif']);
    else if(k==='team')for(const [d,l]of [['users','Utilisateurs'],['messages','Messages'],['organigramme','Organigramme']].filter(([v])=>canViewTeam(C().profile,v)))options.push(['team:'+d,'Équipe · '+l]);
@@ -82,7 +84,7 @@ export function createModules(ctx){
   if(!canViewModule(C().profile,tab))return false;
   salesObserver?.disconnect();salesObserver=null;$('#app').classList.toggle('sales-screen',tab==='sales'&&salesView==='board');
   if(tab==='sales'&&salesView==='board')document.querySelector('main>header').insertBefore($('#toolbar'),document.querySelector('.header-actions'));else $('#metrics').after($('#toolbar'));
-  connect();nav();if(C().profile.role==='employe')modeVO='list';const opsStatus=ctx.operationsStatus?.();if(can('vente')&&['sales','general','settings'].includes(tab)&&(opsStatus?.loading||opsStatus?.error)){header(opsStatus.error?'Données indisponibles':'Chargement des données financières','Synchronisation des produits et des ventes wholesale');$('#content').textContent=opsStatus.error||'Chargement en cours…';return true;}if(['sales','general','serviceBoard','settings'].includes(tab)&&(!loaded||loadError)){header(loadError?'Données indisponibles':'Chargement des tableaux',loadError?'Vérifiez la connexion et le message ci-dessous.':'Synchronisation des données autorisées…');$('#content').innerHTML='<div class="empty">'+(loadError?'Les données n’ont pas pu être chargées. Actualisez la page une fois le problème résolu.':'Chargement en cours…')+'</div>';return true;}if(tab==='vo'&&modeVO==='analysis'){analysis();return true;}if(tab==='sales'){salesBoard();return true;}if(tab==='general'){general();return true;}if(tab==='serviceBoard'){serviceBoard();return true;}if(tab==='settings'){objectives();return true;}return false;}
+  connect();nav();if(!canViewModule(C().profile,'vo'))modeVO='list';const opsStatus=ctx.operationsStatus?.();if(can('vente')&&['sales','general','settings'].includes(tab)&&(opsStatus?.loading||opsStatus?.error)){header(opsStatus.error?'Données indisponibles':'Chargement des données financières','Synchronisation des produits et des ventes wholesale');$('#content').textContent=opsStatus.error||'Chargement en cours…';return true;}if(['sales','general','serviceBoard','settings'].includes(tab)&&(!loaded||loadError)){header(loadError?'Données indisponibles':'Chargement des tableaux',loadError?'Vérifiez la connexion et le message ci-dessous.':'Synchronisation des données autorisées…');$('#content').innerHTML='<div class="empty">'+(loadError?'Les données n’ont pas pu être chargées. Actualisez la page une fois le problème résolu.':'Chargement en cours…')+'</div>';return true;}if(tab==='vo'&&modeVO==='analysis'){analysis();return true;}if(tab==='sales'){salesBoard();return true;}if(tab==='general'){general();return true;}if(tab==='serviceBoard'){serviceBoard();return true;}if(tab==='settings'){objectives();return true;}return false;}
  function analysis(){header('Analyse de préparation','Délais moyens en jours calendaires · dates réellement enregistrées');const r=preparationAnalysis(C().records);$('#content').innerHTML='<div class="ls-summary">'+r.map(p=>card(p.label,fmt(p.total.average,'jours'),p.total.count+' véhicule(s) mesuré(s)')).join('')+'</div><section class="ls-panel"><h2>Délais par étape</h2><div class="ls-table-wrap"><table><thead><tr><th>Étape</th>'+r.map(p=>`<th>${p.label}<small>${p.from} → ${p.exclusive?p.to+' exclu':p.to}</small></th>`).join('')+'</tr></thead><tbody>'+[['inspection','Inspection'],['lavage','Lavage'],['photos','Prise de photos']].map(([k,l])=>'<tr><td>'+l+'</td>'+r.map(p=>'<td><strong>'+fmt(p[k].average,'j')+'</strong><small>'+p[k].count+' étape(s) mesurée(s)</small></td>').join('')+'</tr>').join('')+'</tbody></table></div></section><p class="ls-footnote">Total : arrivée → fin de préparation. Étapes : début → fin. Les dossiers archivés sont inclus; les étapes non requises sont exclues. Les anciennes étapes sans dates ne sont pas estimées.</p><div class="notice">'+r[0].total.missing+' fiche(s) finalisée(s) sans dates suffisantes pour mesurer le délai total. Les dates peuvent être complétées dans le dossier avec des informations vérifiées.</div>';}
  function salesBoard(){
   if(salesView!=='board'&&can('vente')){header('Tableau des ventes · '+(salesView==='products'?'Produits F&I':'Profits et bonis'),'Produits, profits et bonis associés aux ventes enregistrées',monthControls());ctx.renderSalesTools(salesView);return;}
@@ -238,6 +240,6 @@ export function createModules(ctx){
    const id=reportId(d,k,period),c=C();if(c.demo)await put('weeklyReports',id,data);else await c.sdk.runTransaction(c.db,async tx=>{const ref=c.sdk.doc(c.db,'weeklyReports',id),snap=await tx.get(ref);if((snap.exists()?snap.data().version||0:0)!==(old?.version||0))throw Error('Cette période a été modifiée. Rechargez-la avant de réessayer.');tx.set(ref,{...data,updatedAt:new Date().toISOString(),updatedBy:c.user.uid});});dirty=false;ctx.toast('Période enregistrée');ctx.render();
   }catch(err){$('#weeklyError').textContent=err.message;}finally{b.disabled=false;}};
  }
- return {render,stop,openSale,isLoaded:()=>loaded,allSales:()=>sales,financials:()=>finances,sellers:type=>[...salespeople(C().employees,type),HOUSE],findSaleFor:v=>linkedSale(v,sales),accept(plan,financials){sales=sales.filter(s=>s.id!==plan.sale?.id);if(plan.sale)sales.push(plan.sale);if(financials){finances=finances.filter(f=>f.id!==plan.sale.id).concat({...financials,id:plan.sale.id});}localSave();},leave(){dirty=false;},hold(){return dirty||!!dialog?.open;},connect,nav};
+ return {render,stop,openSale,isLoaded:()=>loaded&&!loadError,allSales:()=>sales,financials:()=>finances,sellers:type=>[...salespeople(C().employees,type),HOUSE],findSaleFor:v=>linkedSale(v,sales),accept(plan,financials){sales=sales.filter(s=>s.id!==plan.sale?.id);if(plan.sale)sales.push(plan.sale);if(financials){finances=finances.filter(f=>f.id!==plan.sale.id).concat({...financials,id:plan.sale.id});}localSave();},leave(){dirty=false;},hold(){return dirty||!!dialog?.open;},connect,nav};
 }
 
