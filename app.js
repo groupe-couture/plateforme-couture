@@ -21,7 +21,7 @@ import {stampPreparation,preparationDateErrors} from './preparation-history.mjs?
 import {ROLES,parseRoster,draftErrors,newId,validEmail,employeeDepartmentGroups} from './invitations.mjs?v=1.21.14';
 import {urgentDelivery,reminderDelivery,deliveryReady} from './delivery.mjs?v=1.21.14';
 import {recordErrors} from './record-validation.mjs?v=1.21.14';
-import {preparationSummary} from './preparation-view.mjs?v=1.21.14';
+import {preparationSummary} from './preparation-view.1.21.15.mjs';
 import {TEAM_VIEWS,ACCESS_FIELDS,SUBMENUS,canViewSubcategory,availableSubcategories,canViewTeam,availableTeamViews,canEditObjectives,canManageAccess} from './permissions.mjs?v=1.21.14';
 import {SECTIONS,departmentSummary} from './objectives.mjs?v=1.21.14';
 import {DEPARTMENTS} from './departments.mjs?v=1.21.14';
@@ -31,7 +31,7 @@ import {createSupabaseBridge} from './supabase-bridge.mjs?v=1.21.14';
 const $=s=>document.querySelector(s),demo=new URLSearchParams(location.search).get('demo')==='1';
 const selectedDealership=new URLSearchParams(location.search).get('concession')||'levis-subaru';
 let accessReadinessOpen=false;
-const APP_VERSION='1.21.14';let lastWorkspaceReleaseCheck=0;
+const APP_VERSION='1.21.15';let lastWorkspaceReleaseCheck=0;
 async function checkPublishedWorkspace(){if(Date.now()-lastWorkspaceReleaseCheck<15000)return false;lastWorkspaceReleaseCheck=Date.now();return checkWorkspaceRelease({currentVersion:APP_VERSION,href:location.href});}
 let metricUnsubs=[],metricYear='',departmentData={},objectiveView='vente';
 let employees=[],messages=[],teamView='users',editingEmployee=null,inviteDraft=null,inviting=false,editingMessage=null;
